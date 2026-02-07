@@ -13,12 +13,13 @@ message MeshPacket {
     bytes encrypted = 5;
   }
   fixed32 id = 6;
-  float rx_snr = 7;
-  uint32 hop_limit = 10;
-  bool want_ack = 11;
-  int32 rx_rssi = 14;
+  fixed32 rx_time = 7;
+  float rx_snr = 8;
+  uint32 hop_limit = 9;
+  bool want_ack = 10;
+  int32 rx_rssi = 12;
   uint32 hop_start = 15;
-  uint32 relay_node = 16;
+  uint32 relay_node = 19;
 }
 
 message Data {
