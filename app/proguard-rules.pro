@@ -1,0 +1,2 @@
+-keep class com.meshtop.proto.** { *; }
+-keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite { *; }

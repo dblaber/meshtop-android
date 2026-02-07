@@ -1,0 +1,61 @@
+syntax = "proto3";
+package meshtastic;
+
+option java_package = "com.meshtop.proto";
+option java_outer_classname = "MeshProtos";
+
+message MeshPacket {
+  fixed32 from = 1;
+  fixed32 to = 2;
+  uint32 channel = 3;
+  oneof payload_variant {
+    Data decoded = 4;
+    bytes encrypted = 5;
+  }
+  fixed32 id = 6;
+  float rx_snr = 7;
+  uint32 hop_limit = 10;
+  bool want_ack = 11;
+  int32 rx_rssi = 14;
+  uint32 hop_start = 15;
+  uint32 relay_node = 16;
+}
+
+message Data {
+  PortNum portnum = 1;
+  bytes payload = 2;
+  bool want_response = 3;
+}
+
+message User {
+  string id = 1;
+  string long_name = 2;
+  string short_name = 3;
+}
+
+enum PortNum {
+  UNKNOWN_APP = 0;
+  TEXT_MESSAGE_APP = 1;
+  REMOTE_HARDWARE_APP = 2;
+  POSITION_APP = 3;
+  NODEINFO_APP = 4;
+  ROUTING_APP = 5;
+  ADMIN_APP = 6;
+  TEXT_MESSAGE_COMPRESSED_APP = 7;
+  WAYPOINT_APP = 8;
+  REPLY_APP = 32;
+  IP_TUNNEL_APP = 33;
+  PAXCOUNTER_APP = 34;
+  SERIAL_APP = 64;
+  STORE_FORWARD_APP = 65;
+  RANGE_TEST_APP = 66;
+  TELEMETRY_APP = 67;
+  ZPS_APP = 68;
+  SIMULATOR_APP = 69;
+  TRACEROUTE_APP = 70;
+  NEIGHBORINFO_APP = 71;
+  ATAK_FORWARDER = 72;
+  MAP_REPORT_APP = 73;
+  PRIVATE_APP = 256;
+  ATAK_PLUGIN = 257;
+}
