@@ -100,7 +100,7 @@ fun MainScreen(
             userScrollEnabled = false,
         ) { page ->
             when (page) {
-                0 -> MessagesScreen(state = state)
+                0 -> MessagesScreen(state = state, getRelayName = getRelayName)
                 1 -> GatewaysScreen(state = state)
                 2 -> MyNodesScreen(state = state)
                 3 -> PacketsScreen(state = state, getRelayName = getRelayName)

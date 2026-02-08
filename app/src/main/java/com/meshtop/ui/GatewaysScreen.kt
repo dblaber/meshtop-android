@@ -1,16 +1,20 @@
 package com.meshtop.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -19,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.meshtop.data.GatewayStats
 import com.meshtop.data.MonitorUiState
+import com.meshtop.data.PORTNUM_NAMES
 import com.meshtop.ui.theme.*
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -29,6 +34,7 @@ private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId
 fun GatewaysScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
     val gateways = state.gateways
     val scrollState = rememberScrollState()
+    var selectedGateway by remember { mutableStateOf<GatewayStats?>(null) }
 
     Column(modifier = modifier.fillMaxSize()) {
         // Section description
@@ -73,17 +79,21 @@ fun GatewaysScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(gateways.take(25)) { index, gw ->
-                        GatewayRow(gw, state.hexToNodeId, index)
+                        GatewayRow(gw, state.hexToNodeId, index, onTap = { selectedGateway = gw })
                         HorizontalDivider(color = Color(0xFF1A1A33), thickness = 0.5.dp)
                     }
                 }
             }
         }
     }
+
+    selectedGateway?.let { gw ->
+        GatewayDetailDialog(gw, state) { selectedGateway = null }
+    }
 }
 
 @Composable
-private fun GatewayRow(gw: GatewayStats, hexToNodeId: Map<String, Int>, index: Int) {
+private fun GatewayRow(gw: GatewayStats, hexToNodeId: Map<String, Int>, index: Int, onTap: () -> Unit) {
     val name = gw.shortName.ifEmpty { gw.gatewayId.take(10) }
     val lastByte = hexToNodeId[gw.gatewayId]?.let { String.format("%02x", it and 0xFF) } ?: "-"
     val rssiStr = gw.avgRssi?.let { "%.0f".format(it) } ?: "-"
@@ -95,6 +105,7 @@ private fun GatewayRow(gw: GatewayStats, hexToNodeId: Map<String, Int>, index: I
 
     Row(
         modifier = Modifier
+            .clickable(onClick = onTap)
             .background(rowColor)
             .padding(horizontal = 10.dp, vertical = 5.dp),
     ) {
@@ -110,6 +121,194 @@ private fun GatewayRow(gw: GatewayStats, hexToNodeId: Map<String, Int>, index: I
         DataCell(snrStr, 45.dp)
         DataCell(nodeCount, 48.dp, StatMagenta)
         DataCell(lastSeen, 50.dp, TextDim)
+    }
+}
+
+@Composable
+private fun GatewayDetailDialog(
+    gw: GatewayStats,
+    state: MonitorUiState,
+    onDismiss: () -> Unit,
+) {
+    val fullTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+        .withZone(ZoneId.systemDefault())
+    val shortTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+        .withZone(ZoneId.systemDefault())
+
+    val hexNodeId = state.hexToNodeId[gw.gatewayId]?.let { String.format("!%08x", it) } ?: "-"
+
+    // Compute analytics from recent packets filtered by this gateway
+    val gwPackets = remember(state.recentPackets, gw.gatewayId) {
+        state.recentPackets.filter { it.gatewayId == gw.gatewayId }
+    }
+    val gwMessages = remember(state.recentMessages, gw.gatewayId) {
+        state.recentMessages.filter { it.gatewayId == gw.gatewayId }
+    }
+
+    // Port type breakdown
+    val portBreakdown = remember(gwPackets) {
+        gwPackets.groupBy { it.portnumName }
+            .mapValues { it.value.size }
+            .entries.sortedByDescending { it.value }
+    }
+
+    // Hop distribution
+    val hopDistribution = remember(gwPackets) {
+        val hops = mutableMapOf<Int, Int>()
+        for (pkt in gwPackets) {
+            val h = if (pkt.hopStart > 0) pkt.hopStart - pkt.hopLimit else -1
+            if (h >= 0) hops[h] = (hops[h] ?: 0) + 1
+        }
+        hops.entries.sortedBy { it.key }
+    }
+
+    // Top nodes
+    val topNodes = remember(gwPackets) {
+        gwPackets.groupBy { it.fromId }
+            .mapValues { entry -> entry.value.size to entry.value.first().fromName }
+            .entries.sortedByDescending { it.value.first }
+            .take(10)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceCard,
+        title = {
+            Text(
+                text = "Gateway Details",
+                color = HeaderBlue,
+                fontFamily = Mono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+            )
+        },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                // --- Header section ---
+                GwDetailRow("Name", "${gw.shortName.ifEmpty { "-" }} / ${gw.longName.ifEmpty { "-" }}")
+                GwDetailRow("Gateway ID", gw.gatewayId)
+                GwDetailRow("Node ID", hexNodeId)
+                GwDetailRow("Last Seen", gw.lastSeen?.let { fullTimeFormatter.format(it) } ?: "-")
+
+                GwSectionHeader("Packet Stats")
+                GwDetailRow("Total", "${gw.packetCount}")
+                GwDetailRow("Messages", "${gw.messageCount}")
+                GwDetailRow("Total Dir", "${gw.totalDirectCount}")
+                GwDetailRow("Total Rly", "${gw.totalRelayedCount}")
+                GwDetailRow("Clean Dir", "${gw.cleanDirectCount}")
+                GwDetailRow("Clean Rly", "${gw.cleanRelayedCount}")
+                GwDetailRow("Total Cln", "${gw.totalClean}")
+                GwDetailRow("Avg RSSI", gw.avgRssi?.let { "%.1f dBm".format(it) } ?: "-")
+                GwDetailRow("Avg SNR", gw.avgSnr?.let { "%.1f dB".format(it) } ?: "-")
+                GwDetailRow("Uniq Nodes", "${gw.uniqueNodes.size}")
+
+                if (portBreakdown.isNotEmpty()) {
+                    GwSectionHeader("Packet Types")
+                    portBreakdown.forEach { (port, count) ->
+                        GwDetailRow(port, "$count")
+                    }
+                }
+
+                if (hopDistribution.isNotEmpty()) {
+                    GwSectionHeader("Hop Distribution")
+                    hopDistribution.forEach { (hops, count) ->
+                        val color = when (hops) {
+                            0 -> DirectGreen
+                            1 -> Color(0xFFE0E0E0)
+                            else -> RelayOrange
+                        }
+                        GwDetailRow("$hops hops", "$count", valueColor = color)
+                    }
+                }
+
+                if (topNodes.isNotEmpty()) {
+                    GwSectionHeader("Top Nodes")
+                    topNodes.forEach { entry ->
+                        val (count, name) = entry.value
+                        GwDetailRow(name.take(12), "$count pkts")
+                    }
+                }
+
+                if (gwMessages.isNotEmpty()) {
+                    GwSectionHeader("Recent Messages")
+                    gwMessages.take(10).forEach { msg ->
+                        val time = shortTimeFormatter.format(msg.timestamp)
+                        val text = msg.text.replace('\n', ' ').take(40)
+                        Column(modifier = Modifier.padding(vertical = 2.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    text = msg.fromName.take(8),
+                                    color = FirstHearerCyan,
+                                    fontFamily = Mono,
+                                    fontSize = 11.sp,
+                                )
+                                Text(
+                                    text = time,
+                                    color = TextDim,
+                                    fontFamily = Mono,
+                                    fontSize = 11.sp,
+                                )
+                            }
+                            Text(
+                                text = text,
+                                color = Color(0xFFE0E0E0),
+                                fontFamily = Mono,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = FirstHearerCyan, fontFamily = Mono)
+            }
+        },
+    )
+}
+
+@Composable
+private fun GwSectionHeader(title: String) {
+    Spacer(modifier = Modifier.height(10.dp))
+    HorizontalDivider(color = Color(0xFF333355))
+    Spacer(modifier = Modifier.height(6.dp))
+    Text(
+        text = title,
+        color = HeaderBlue,
+        fontFamily = Mono,
+        fontWeight = FontWeight.Bold,
+        fontSize = 13.sp,
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+}
+
+@Composable
+private fun GwDetailRow(label: String, value: String, valueColor: Color = Color(0xFFE0E0E0)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = label,
+            color = TextDim,
+            fontFamily = Mono,
+            fontSize = 12.sp,
+            modifier = Modifier.width(90.dp),
+        )
+        Text(
+            text = value,
+            color = valueColor,
+            fontFamily = Mono,
+            fontSize = 12.sp,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
