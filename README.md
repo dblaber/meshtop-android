@@ -19,7 +19,9 @@ An Android app for monitoring Meshtastic mesh networks via MQTT. Provides real-t
 
 ## Screenshots
 
-*Coming soon*
+| Messages | Gateway Details | Packets |
+|----------|----------------|---------|
+| ![Messages](screenshots/Screenshot_20260207-224323.png) | ![Gateway Details](screenshots/Screenshot_20260207-224150.png) | ![Packets](screenshots/Screenshot_20260207-224126.png) |
 
 ## Setup
 
