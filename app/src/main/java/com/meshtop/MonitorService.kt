@@ -1,10 +1,13 @@
 package com.meshtop
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.meshtop.data.MessageInfo
@@ -47,7 +50,16 @@ class MonitorService : Service() {
             .setOngoing(true)
             .build()
 
-        startForeground(NOTIFICATION_ID_SERVICE, notification)
+        try {
+            startForeground(NOTIFICATION_ID_SERVICE, notification)
+        } catch (e: Exception) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && e is ForegroundServiceStartNotAllowedException) {
+                Log.e("MonitorService", "Foreground service not allowed, stopping", e)
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            throw e
+        }
 
         // Watch for new messages and fire notifications
         observeMessages()

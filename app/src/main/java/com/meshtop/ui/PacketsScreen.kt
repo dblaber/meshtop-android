@@ -5,7 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -94,7 +94,8 @@ fun PacketsScreen(
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(packets.take(80), key = { "${it.packetId}_${it.gatewayId}" }) { pkt ->
+                    val displayed = packets.take(80)
+                    itemsIndexed(displayed, key = { index, pkt -> "${index}_${pkt.packetId}_${pkt.gatewayId}" }) { _, pkt ->
                         PacketRow(pkt, firstHearers, getRelayName, onTap = { selectedPacket = pkt })
                         HorizontalDivider(color = Color(0xFF1A1A33), thickness = 0.5.dp)
                     }
