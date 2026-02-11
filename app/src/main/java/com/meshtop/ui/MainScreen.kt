@@ -59,11 +59,10 @@ fun MainScreen(
         StatsHeader(state = state)
 
         // Tab row
-        ScrollableTabRow(
+        TabRow(
             selectedTabIndex = pagerState.currentPage,
             containerColor = SurfaceCard,
             contentColor = Color(0xFFE0E0E0),
-            edgePadding = 0.dp,
             divider = { HorizontalDivider(color = Color(0xFF333355)) },
             indicator = { tabPositions ->
                 if (pagerState.currentPage < tabPositions.size) {
