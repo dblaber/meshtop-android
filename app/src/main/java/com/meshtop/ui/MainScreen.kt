@@ -21,7 +21,7 @@ import com.meshtop.data.MonitorUiState
 import com.meshtop.ui.theme.*
 import kotlinx.coroutines.launch
 
-private val TAB_TITLES = listOf("Summary", "Messages", "Gateways", "My Nodes", "Packets")
+private val TAB_TITLES = listOf("", "Msgs", "Gates", "Nodes", "Pkts")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
