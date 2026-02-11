@@ -14,6 +14,7 @@ class SettingsStore(context: Context) {
         password = prefs.getString("password", "") ?: "",
         topic = prefs.getString("topic", "msh/US/2/e/LongFast/#") ?: "msh/US/2/e/LongFast/#",
         myNodes = prefs.getStringSet("my_nodes", emptySet()) ?: emptySet(),
+        persistSession = prefs.getBoolean("persist_session", false),
         dbHost = prefs.getString("db_host", "") ?: "",
         dbPort = prefs.getInt("db_port", 5432),
         dbName = prefs.getString("db_name", "") ?: "",
@@ -29,6 +30,7 @@ class SettingsStore(context: Context) {
             .putString("password", settings.password)
             .putString("topic", settings.topic)
             .putStringSet("my_nodes", settings.myNodes)
+            .putBoolean("persist_session", settings.persistSession)
             .putString("db_host", settings.dbHost)
             .putInt("db_port", settings.dbPort)
             .putString("db_name", settings.dbName)

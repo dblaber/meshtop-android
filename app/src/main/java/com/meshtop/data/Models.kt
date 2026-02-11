@@ -1,6 +1,18 @@
 package com.meshtop.data
 
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import java.time.Instant
+
+object InstantSerializer : KSerializer<Instant> {
+    override val descriptor = PrimitiveSerialDescriptor("Instant", PrimitiveKind.LONG)
+    override fun serialize(encoder: Encoder, value: Instant) = encoder.encodeLong(value.toEpochMilli())
+    override fun deserialize(decoder: Decoder): Instant = Instant.ofEpochMilli(decoder.decodeLong())
+}
 
 val PORTNUM_NAMES = mapOf(
     0 to "UNKNOWN",
@@ -29,6 +41,7 @@ val PORTNUM_NAMES = mapOf(
     257 to "ATAK_PLG",
 )
 
+@Serializable
 data class GatewayStats(
     val gatewayId: String,
     var shortName: String = "",
@@ -44,6 +57,7 @@ data class GatewayStats(
     var cleanSnrSum: Double = 0.0,
     var cleanSnrCount: Int = 0,
     val uniqueNodes: MutableSet<Int> = mutableSetOf(),
+    @Serializable(with = InstantSerializer::class)
     var lastSeen: Instant? = null,
 ) {
     val totalClean: Int get() = cleanDirectCount + cleanRelayedCount
@@ -51,6 +65,7 @@ data class GatewayStats(
     val avgSnr: Double? get() = if (cleanSnrCount > 0) cleanSnrSum / cleanSnrCount else null
 }
 
+@Serializable
 data class NodeStats(
     val nodeId: Int,
     var shortName: String = "",
@@ -67,6 +82,7 @@ data class NodeStats(
     var hopSum: Int = 0,
     var hopCount: Int = 0,
     val gatewaysHeardBy: MutableSet<String> = mutableSetOf(),
+    @Serializable(with = InstantSerializer::class)
     var lastSeen: Instant? = null,
 ) {
     val avgRssi: Double? get() = if (rssiCount > 0) rssiSum / rssiCount else null
@@ -74,7 +90,9 @@ data class NodeStats(
     val avgHops: Double? get() = if (hopCount > 0) hopSum.toDouble() / hopCount else null
 }
 
+@Serializable
 data class PacketInfo(
+    @Serializable(with = InstantSerializer::class)
     val timestamp: Instant,
     val fromId: Int,
     val fromName: String,
@@ -92,7 +110,9 @@ data class PacketInfo(
     val relayNode: Int = 0,
 )
 
+@Serializable
 data class MessageInfo(
+    @Serializable(with = InstantSerializer::class)
     val timestamp: Instant,
     val fromId: Int,
     val fromName: String,
@@ -110,6 +130,7 @@ data class MessageInfo(
     val packetId: Int = 0,
 )
 
+@Serializable
 data class RelayNodeStats(
     val nodeId: Int,
     val shortName: String,
@@ -215,6 +236,7 @@ data class ConnectionSettings(
     val password: String = "",
     val topic: String = "msh/US/2/e/LongFast/#",
     val myNodes: Set<String> = emptySet(),
+    val persistSession: Boolean = false,
     // Optional PostgreSQL settings (empty = disabled)
     val dbHost: String = "",
     val dbPort: Int = 5432,

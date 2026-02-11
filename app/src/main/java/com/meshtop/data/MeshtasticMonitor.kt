@@ -8,6 +8,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.Serializable
 import org.eclipse.paho.client.mqttv3.*
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import java.nio.ByteBuffer
@@ -18,6 +19,25 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+
+@Serializable
+data class MonitorSnapshot(
+    val gateways: Map<String, GatewayStats>,
+    val myNodes: Map<String, NodeStats>,
+    val nodeNames: Map<Int, String>,
+    val nodeLongNames: Map<Int, String>,
+    val hexToNodeId: Map<String, Int>,
+    val gatewayNodeIds: Set<Int>,
+    val myNodeLastBytes: Set<Int>,
+    val lastByteToNames: Map<Int, List<String>>,
+    val relayNodeStats: Map<Int, Map<Int, RelayNodeStats>>,
+    val recentPackets: List<PacketInfo>,
+    val recentMessages: List<MessageInfo>,
+    val totalPackets: Int,
+    val decryptedPackets: Int,
+    val failedDecryptions: Int,
+    val uptimeMillis: Long,
+)
 
 private const val TAG = "MeshtasticMonitor"
 private const val MAX_PACKETS = 200
@@ -637,6 +657,57 @@ class MeshtasticMonitor {
 
             return "!..${String.format("%02x", relayNode)}"
         }
+    }
+
+    fun createSnapshot(): MonitorSnapshot = synchronized(this) {
+        MonitorSnapshot(
+            gateways = gateways.toMap(),
+            myNodes = myNodes.toMap(),
+            nodeNames = nodeNames.toMap(),
+            nodeLongNames = nodeLongNames.toMap(),
+            hexToNodeId = hexToNodeId.toMap(),
+            gatewayNodeIds = gatewayNodeIds.toSet(),
+            myNodeLastBytes = myNodeLastBytes.toSet(),
+            lastByteToNames = lastByteToNames.mapValues { (_, v) -> v.toList() },
+            relayNodeStats = relayNodeStats.mapValues { (_, v) -> v.toMap() },
+            recentPackets = recentPackets.toList(),
+            recentMessages = recentMessages.toList(),
+            totalPackets = totalPackets,
+            decryptedPackets = decryptedPackets,
+            failedDecryptions = failedDecryptions,
+            uptimeMillis = System.currentTimeMillis() - startTime,
+        )
+    }
+
+    fun restoreFromSnapshot(snapshot: MonitorSnapshot) = synchronized(this) {
+        gateways.clear()
+        gateways.putAll(snapshot.gateways)
+        myNodes.clear()
+        myNodes.putAll(snapshot.myNodes)
+        nodeNames.clear()
+        nodeNames.putAll(snapshot.nodeNames)
+        nodeLongNames.clear()
+        nodeLongNames.putAll(snapshot.nodeLongNames)
+        hexToNodeId.clear()
+        hexToNodeId.putAll(snapshot.hexToNodeId)
+        gatewayNodeIds.clear()
+        gatewayNodeIds.addAll(snapshot.gatewayNodeIds)
+        myNodeLastBytes.clear()
+        myNodeLastBytes.addAll(snapshot.myNodeLastBytes)
+        lastByteToNames.clear()
+        snapshot.lastByteToNames.forEach { (k, v) -> lastByteToNames[k] = v.toMutableList() }
+        relayNodeStats.clear()
+        snapshot.relayNodeStats.forEach { (k, v) -> relayNodeStats[k] = v.toMutableMap() }
+        recentPackets.clear()
+        recentPackets.addAll(snapshot.recentPackets)
+        recentMessages.clear()
+        recentMessages.addAll(snapshot.recentMessages)
+        totalPackets = snapshot.totalPackets
+        decryptedPackets = snapshot.decryptedPackets
+        failedDecryptions = snapshot.failedDecryptions
+        startTime = System.currentTimeMillis() - snapshot.uptimeMillis
+        isDirty.set(true)
+        Log.i(TAG, "Restored snapshot: ${snapshot.totalPackets} packets, ${snapshot.gateways.size} gateways")
     }
 
     private fun emitState() {

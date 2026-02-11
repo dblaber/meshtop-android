@@ -8,6 +8,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
@@ -32,6 +33,7 @@ fun SettingsScreen(
     var password by remember(settings) { mutableStateOf(settings.password) }
     var topic by remember(settings) { mutableStateOf(settings.topic) }
     var myNodes by remember(settings) { mutableStateOf(settings.myNodes.joinToString(", ")) }
+    var persistSession by remember(settings) { mutableStateOf(settings.persistSession) }
 
     var dbHost by remember(settings) { mutableStateOf(settings.dbHost) }
     var dbPort by remember(settings) { mutableStateOf(settings.dbPort.toString()) }
@@ -107,6 +109,37 @@ fun SettingsScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        Text(
+            text = "Storage",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Persist session data",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Save gateways, nodes, messages, and packets across app restarts",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = persistSession,
+                onCheckedChange = { persistSession = it },
+            )
+        }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -190,6 +223,7 @@ fun SettingsScreen(
                         password = password.trim(),
                         topic = topic.trim(),
                         myNodes = myNodes.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
+                        persistSession = persistSession,
                         dbHost = dbHost.trim(),
                         dbPort = dbPort.trim().toIntOrNull() ?: 5432,
                         dbName = dbName.trim(),
