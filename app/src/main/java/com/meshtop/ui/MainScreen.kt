@@ -3,10 +3,13 @@ package com.meshtop.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,7 +21,7 @@ import com.meshtop.data.MonitorUiState
 import com.meshtop.ui.theme.*
 import kotlinx.coroutines.launch
 
-private val TAB_TITLES = listOf("Messages", "Gateways", "My Nodes", "Packets")
+private val TAB_TITLES = listOf("Summary", "Messages", "Gateways", "My Nodes", "Packets")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +83,7 @@ fun MainScreen(
                 Tab(
                     selected = selected,
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
-                    text = {
+                    text = if (index > 0) {{
                         Text(
                             text = title,
                             fontFamily = Mono,
@@ -88,7 +91,15 @@ fun MainScreen(
                             fontSize = 13.sp,
                             color = color,
                         )
-                    }
+                    }} else null,
+                    icon = if (index == 0) {{
+                        Icon(
+                            imageVector = Icons.Filled.Home,
+                            contentDescription = "Summary",
+                            tint = color,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }} else null,
                 )
             }
         }
@@ -100,10 +111,11 @@ fun MainScreen(
             userScrollEnabled = false,
         ) { page ->
             when (page) {
-                0 -> MessagesScreen(state = state, getRelayName = getRelayName)
-                1 -> GatewaysScreen(state = state)
-                2 -> MyNodesScreen(state = state)
-                3 -> PacketsScreen(state = state, getRelayName = getRelayName)
+                0 -> SummaryScreen(state = state)
+                1 -> MessagesScreen(state = state, getRelayName = getRelayName)
+                2 -> GatewaysScreen(state = state)
+                3 -> MyNodesScreen(state = state)
+                4 -> PacketsScreen(state = state, getRelayName = getRelayName)
             }
         }
     }

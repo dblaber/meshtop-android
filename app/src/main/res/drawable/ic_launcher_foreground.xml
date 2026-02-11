@@ -145,33 +145,28 @@
         android:pathData="M54,40 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0"
         android:fillColor="#66BB6A" />
 
-    <!-- "meshtop" text below the mesh -->
-    <path
-        android:pathData="M32,72 L32,72"
-        android:fillColor="#00000000" />
-
-    <!-- Text label -->
+    <!-- "meshtop" text label -->
     <group>
         <!-- m -->
-        <path android:pathData="M30,68 L30,74 M30,69 L32,68 L34,69 L34,74 M34,69 L36,68 L38,69 L38,74"
-            android:strokeColor="#E0E0E0" android:strokeWidth="1.2" android:fillColor="#00000000" />
+        <path android:pathData="M33.5,75 V69 C33.5,66.5 37,66.5 37,69 V75 M37,69 C37,66.5 40.5,66.5 40.5,69 V75"
+            android:strokeColor="#E0E0E0" android:strokeWidth="1.5" android:strokeLineCap="round" android:fillColor="#00000000" />
         <!-- e -->
-        <path android:pathData="M40,71 L44,71 L44,70 A2,2 0 0,0 40,70 L40,72 A2,2 0 0,0 44,72"
-            android:strokeColor="#E0E0E0" android:strokeWidth="1.2" android:fillColor="#00000000" />
+        <path android:pathData="M46.5,71 C46.5,67.5 42.5,67.5 42.5,71 C42.5,75 46.5,75 46.5,72.5 M42.5,71 L46.5,71"
+            android:strokeColor="#E0E0E0" android:strokeWidth="1.5" android:strokeLineCap="round" android:fillColor="#00000000" />
         <!-- s -->
-        <path android:pathData="M49,69 L47,68 L46,69 L47,70 L48,71 L49,72 L48,73 L46,73"
-            android:strokeColor="#E0E0E0" android:strokeWidth="1.2" android:fillColor="#00000000" />
+        <path android:pathData="M51.5,69.5 C51.5,67.5 48,67.5 48,70 C48,72 51.5,72 51.5,73.5 C51.5,75.5 48,75.5 48,74"
+            android:strokeColor="#E0E0E0" android:strokeWidth="1.5" android:strokeLineCap="round" android:fillColor="#00000000" />
         <!-- h -->
-        <path android:pathData="M51,66 L51,74 M51,69 L53,68 L55,69 L55,74"
-            android:strokeColor="#E0E0E0" android:strokeWidth="1.2" android:fillColor="#00000000" />
+        <path android:pathData="M54,64 V75 M54,69 C54,67 58,67 58,69 V75"
+            android:strokeColor="#E0E0E0" android:strokeWidth="1.5" android:strokeLineCap="round" android:fillColor="#00000000" />
         <!-- t -->
-        <path android:pathData="M57,66 L57,72 A1.5,1.5 0 0,0 60,72 M55.5,68 L59,68"
-            android:strokeColor="#E0E0E0" android:strokeWidth="1.2" android:fillColor="#00000000" />
+        <path android:pathData="M61.5,65 V73 C61.5,75 63.5,75 63.5,73.5 M60,68 L63.5,68"
+            android:strokeColor="#E0E0E0" android:strokeWidth="1.5" android:strokeLineCap="round" android:fillColor="#00000000" />
         <!-- o -->
-        <path android:pathData="M63,71 A2.5,2.5 0 1,0 63,70.9"
-            android:strokeColor="#E0E0E0" android:strokeWidth="1.2" android:fillColor="#00000000" />
+        <path android:pathData="M65,71.5 C65,67.5 68.5,67.5 68.5,71.5 C68.5,75.5 65,75.5 65,71.5"
+            android:strokeColor="#E0E0E0" android:strokeWidth="1.5" android:strokeLineCap="round" android:fillColor="#00000000" />
         <!-- p -->
-        <path android:pathData="M68,68 L68,78 M68,69 A2.5,2.5 0 1,0 68,72"
-            android:strokeColor="#E0E0E0" android:strokeWidth="1.2" android:fillColor="#00000000" />
+        <path android:pathData="M70.5,68 V79 M70.5,69 C70.5,67 74.5,67 74.5,71.5 C74.5,75 70.5,75 70.5,72"
+            android:strokeColor="#E0E0E0" android:strokeWidth="1.5" android:strokeLineCap="round" android:fillColor="#00000000" />
     </group>
 </vector>

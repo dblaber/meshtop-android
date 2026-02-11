@@ -4,7 +4,7 @@
 
 meshtop-android is an Android app that monitors Meshtastic mesh networks via MQTT, built with Kotlin and Jetpack Compose.
 
-The app connects to an MQTT broker, receives Meshtastic mesh packets, decrypts them (AES-128-CTR), and displays real-time statistics across four tabbed views: Messages, Gateways, My Nodes, and Packets.
+The app connects to an MQTT broker, receives Meshtastic mesh packets, decrypts them (AES-128-CTR), and displays real-time statistics across five tabbed views: Summary, Messages, Gateways, My Nodes, and Packets.
 
 ## Build & Run
 
@@ -33,7 +33,8 @@ com.meshtop/
 ├── viewmodel/
 │   └── MonitorViewModel.kt  # AndroidViewModel bridging MeshtasticMonitor to Compose UI
 └── ui/
-    ├── MainScreen.kt        # HorizontalPager with tab bar (Messages, Gateways, My Nodes, Packets)
+    ├── MainScreen.kt        # HorizontalPager with tab bar (Summary, Messages, Gateways, My Nodes, Packets)
+    ├── SummaryScreen.kt     # Network overview dashboard with Canvas-based visualizations (6 cards)
     ├── MessagesScreen.kt    # Card-based message display grouped by packetId
     ├── GatewaysScreen.kt    # Gateway stats table + shared composables (SectionDescription, HeaderCell, DataCell)
     ├── MyNodesScreen.kt     # Tracked node stats table (dynamic from settings)
