@@ -7,8 +7,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -17,7 +19,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.meshtop.data.MessageInfo
 import com.meshtop.data.MonitorUiState
+import com.meshtop.data.PacketInfo
 import com.meshtop.ui.theme.*
 
 // Colors for packet type bars
@@ -37,6 +41,41 @@ private val DefaultBarColor = TextDim
 
 @Composable
 fun SummaryScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
+    var hideGateways by remember { mutableStateOf(false) }
+    var hideMyNodes by remember { mutableStateOf(false) }
+
+    // Derive excluded node IDs from toggles
+    val gatewayNodeIds by remember(state.gateways, state.hexToNodeId) {
+        derivedStateOf {
+            state.gateways.mapNotNull { gw -> state.hexToNodeId[gw.gatewayId] }.toSet()
+        }
+    }
+    val myNodeIds by remember(state.myNodes) {
+        derivedStateOf { state.myNodes.values.map { it.nodeId }.toSet() }
+    }
+
+    val excludedIds by remember(hideGateways, hideMyNodes, gatewayNodeIds, myNodeIds) {
+        derivedStateOf {
+            buildSet {
+                if (hideGateways) addAll(gatewayNodeIds)
+                if (hideMyNodes) addAll(myNodeIds)
+            }
+        }
+    }
+
+    val filteredPackets by remember(state.recentPackets, excludedIds) {
+        derivedStateOf {
+            if (excludedIds.isEmpty()) state.recentPackets
+            else state.recentPackets.filter { it.fromId !in excludedIds }
+        }
+    }
+    val filteredMessages by remember(state.recentMessages, excludedIds) {
+        derivedStateOf {
+            if (excludedIds.isEmpty()) state.recentMessages
+            else state.recentMessages.filter { it.fromId !in excludedIds }
+        }
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -44,12 +83,67 @@ fun SummaryScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
         contentPadding = PaddingValues(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item { NetworkOverview(state) }
-        item { PacketTypesChart(state) }
-        item { SignalQualityChart(state) }
-        item { HopDistributionChart(state) }
+        item { FilterToggles(hideGateways, hideMyNodes, { hideGateways = it }, { hideMyNodes = it }) }
+        item { NetworkOverview(state, filteredPackets, filteredMessages) }
+        item { PacketTypesChart(filteredPackets) }
+        item { SignalQualityChart(filteredPackets) }
+        item { HopDistributionChart(filteredPackets) }
         item { TopGatewaysChart(state) }
-        item { TopNodesChart(state) }
+        item { TopNodesChart(filteredPackets) }
+    }
+}
+
+// ── Filter toggles ──────────────────────────────────────────────────
+
+@Composable
+private fun FilterToggles(
+    hideGateways: Boolean,
+    hideMyNodes: Boolean,
+    onHideGatewaysChange: (Boolean) -> Unit,
+    onHideMyNodesChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilterToggle("Hide gateways", hideGateways, onHideGatewaysChange, Modifier.weight(1f))
+        FilterToggle("Hide my nodes", hideMyNodes, onHideMyNodesChange, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun FilterToggle(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .background(SurfaceCard, RoundedCornerShape(6.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            fontFamily = Mono,
+            fontSize = 11.sp,
+            color = if (checked) FirstHearerCyan else TextDim,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = FirstHearerCyan,
+                checkedTrackColor = FirstHearerCyan.copy(alpha = 0.3f),
+                uncheckedThumbColor = TextDim,
+                uncheckedTrackColor = SurfaceDark,
+                uncheckedBorderColor = TextDim.copy(alpha = 0.3f),
+            ),
+            modifier = Modifier.height(28.dp),
+        )
     }
 }
 
@@ -158,10 +252,14 @@ private fun HorizontalBarRow(
 // ── Section 1: Network Overview ─────────────────────────────────────
 
 @Composable
-private fun NetworkOverview(state: MonitorUiState) {
-    val uniqueNodes = state.recentPackets.map { it.fromId }.toSet().size
+private fun NetworkOverview(
+    state: MonitorUiState,
+    packets: List<PacketInfo>,
+    messages: List<MessageInfo>,
+) {
+    val uniqueNodes = packets.map { it.fromId }.toSet().size
     val activeGateways = state.gateways.size
-    val messages = state.recentMessages.size
+    val msgCount = messages.size
     val total = state.totalPackets
     val decrypted = state.decryptedPackets
     val decryptRate = if (total > 0) "%.0f%%".format(decrypted * 100.0 / total) else "—"
@@ -179,7 +277,7 @@ private fun NetworkOverview(state: MonitorUiState) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            MetricCard("Messages", "$messages", StatMagenta, Modifier.weight(1f))
+            MetricCard("Messages", "$msgCount", StatMagenta, Modifier.weight(1f))
             MetricCard("Decrypt %", decryptRate, WarningYellow, Modifier.weight(1f))
         }
     }
@@ -188,8 +286,8 @@ private fun NetworkOverview(state: MonitorUiState) {
 // ── Section 2: Packet Types ─────────────────────────────────────────
 
 @Composable
-private fun PacketTypesChart(state: MonitorUiState) {
-    val counts = state.recentPackets
+private fun PacketTypesChart(packets: List<PacketInfo>) {
+    val counts = packets
         .groupingBy { it.portnumName }
         .eachCount()
         .entries
@@ -215,8 +313,8 @@ private fun PacketTypesChart(state: MonitorUiState) {
 // ── Section 3: Signal Quality (RSSI) ────────────────────────────────
 
 @Composable
-private fun SignalQualityChart(state: MonitorUiState) {
-    val rssiValues = state.recentPackets.mapNotNull { it.rssi?.toInt() }
+private fun SignalQualityChart(packets: List<PacketInfo>) {
+    val rssiValues = packets.mapNotNull { it.rssi?.toInt() }
 
     val excellent = rssiValues.count { it > -90 }
     val good = rssiValues.count { it in -105..-90 }
@@ -239,8 +337,8 @@ private fun SignalQualityChart(state: MonitorUiState) {
 // ── Section 4: Hop Distribution ─────────────────────────────────────
 
 @Composable
-private fun HopDistributionChart(state: MonitorUiState) {
-    val hops = state.recentPackets.map { (it.hopStart - it.hopLimit).coerceAtLeast(0) }
+private fun HopDistributionChart(packets: List<PacketInfo>) {
+    val hops = packets.map { (it.hopStart - it.hopLimit).coerceAtLeast(0) }
 
     val direct = hops.count { it == 0 }
     val hop1 = hops.count { it == 1 }
@@ -298,8 +396,8 @@ private fun TopGatewaysChart(state: MonitorUiState) {
 // ── Section 6: Top Nodes (Recent) ───────────────────────────────────
 
 @Composable
-private fun TopNodesChart(state: MonitorUiState) {
-    val counts = state.recentPackets
+private fun TopNodesChart(packets: List<PacketInfo>) {
+    val counts = packets
         .groupingBy { it.fromName.ifBlank { "!%08x".format(it.fromId) } }
         .eachCount()
         .entries
