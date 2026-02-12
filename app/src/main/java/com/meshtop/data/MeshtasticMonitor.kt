@@ -122,6 +122,30 @@ class MeshtasticMonitor {
         emitState()
     }
 
+    fun clearAllData() = synchronized(this) {
+        gateways.clear()
+        myNodes.clear()
+        nodeNames.clear()
+        nodeLongNames.clear()
+        hexToNodeId.clear()
+        gatewayNodeIds.clear()
+        myNodeLastBytes.clear()
+        lastByteToNames.clear()
+        relayNodeStats.clear()
+        recentPackets.clear()
+        recentMessages.clear()
+        totalPackets = 0
+        decryptedPackets = 0
+        failedDecryptions = 0
+        startTime = System.currentTimeMillis()
+        dbConfigured = false
+        dbConnecting = false
+        dbLoaded = false
+        dbError = null
+        dbNodeCount = 0
+        isDirty.set(true)
+    }
+
     fun destroy() {
         disconnect()
         scope.cancel()

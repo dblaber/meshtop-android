@@ -34,6 +34,7 @@ fun MainScreen(
     onHideSettings: () -> Unit,
     onSaveSettings: (ConnectionSettings) -> Unit,
     onReconnect: () -> Unit,
+    onClearStorage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (showSettings) {
@@ -41,6 +42,7 @@ fun MainScreen(
             settings = settings,
             onSave = onSaveSettings,
             onReconnect = onReconnect,
+            onClearStorage = onClearStorage,
             onDismiss = onHideSettings,
             modifier = modifier,
         )

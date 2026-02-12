@@ -24,6 +24,7 @@ fun SettingsScreen(
     settings: ConnectionSettings,
     onSave: (ConnectionSettings) -> Unit,
     onReconnect: () -> Unit,
+    onClearStorage: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -139,6 +140,16 @@ fun SettingsScreen(
                 checked = persistSession,
                 onCheckedChange = { persistSession = it },
             )
+        }
+
+        OutlinedButton(
+            onClick = onClearStorage,
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Clear Stored Data")
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

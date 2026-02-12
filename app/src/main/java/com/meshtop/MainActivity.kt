@@ -97,6 +97,7 @@ class MainActivity : ComponentActivity() {
                         onHideSettings = viewModel::hideSettings,
                         onSaveSettings = viewModel::updateSettings,
                         onReconnect = viewModel::reconnect,
+                        onClearStorage = viewModel::clearStorage,
                         modifier = Modifier.padding(innerPadding),
                     )
                 }

@@ -108,6 +108,19 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun clearStorage() {
+        stateStore.clear()
+        monitor.disconnect()
+        monitor.clearAllData()
+        val s = _settings.value
+        if (s.dbEnabled) {
+            monitor.loadNodeNamesFromDb(s)
+        }
+        viewModelScope.launch {
+            monitor.connect(s)
+        }
+    }
+
     fun toggleSettings() {
         _showSettings.value = !_showSettings.value
     }
