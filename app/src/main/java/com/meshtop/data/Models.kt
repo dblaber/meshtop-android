@@ -141,6 +141,7 @@ data class RelayNodeStats(
     var directSnrCount: Int = 0,
     var directHopSum: Int = 0,
     var directHopCount: Int = 0,
+    var zeroHopCount: Int = 0,
     var relayCount: Int = 0,
     var relayRssiSum: Double = 0.0,
     var relayRssiCount: Int = 0,
@@ -164,12 +165,20 @@ data class RelayNodeStats(
     fun score(currentTime: Long): Double {
         var s = 0.0
 
+        // Never seen directly — heavy penalty, only allow if strong relay evidence
         if (directPacketCount == 0) {
             if (relayCount < 5 || lastSeenRelay == null) return -2000.0
             if ((currentTime - lastSeenRelay!!) > 300_000) return -2000.0
             s = -500.0
         }
 
+        // 0-hop observations are the strongest signal (malla approach):
+        // a node received at 0 hops is local and very likely a relay candidate
+        if (zeroHopCount > 0) {
+            s += 1000.0 + minOf(zeroHopCount * 20.0, 500.0)
+        }
+
+        // Hop distance — disqualify far-away nodes, reward local ones
         val avgHops = avgDirectHops
         if (avgHops != null) {
             s += when {
@@ -182,8 +191,9 @@ data class RelayNodeStats(
             }
         }
 
+        // Relay observations — capped to prevent runaway accumulation
         if (relayCount > 0) {
-            s += relayCount * 50.0
+            s += minOf(relayCount * 20.0, 400.0)
             lastSeenRelay?.let { lsr ->
                 val ageMinutes = (currentTime - lsr) / 60_000.0
                 s += when {
@@ -195,6 +205,7 @@ data class RelayNodeStats(
             }
         }
 
+        // Direct packet activity
         if (directPacketCount > 0) {
             s += 50.0 + minOf(directPacketCount * 2.0, 100.0)
             lastSeenDirect?.let { lsd ->
@@ -209,6 +220,7 @@ data class RelayNodeStats(
             }
         }
 
+        // Signal quality — minor tiebreaker
         avgRelayRssi?.let { rssi ->
             val normalized = ((rssi + 120) / 90.0).coerceIn(0.0, 1.0)
             s += normalized * 10.0

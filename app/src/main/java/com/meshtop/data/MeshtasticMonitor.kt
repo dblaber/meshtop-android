@@ -466,7 +466,11 @@ class MeshtasticMonitor {
                     stats.lastSeenDirect = System.currentTimeMillis()
                     rssi?.let { if (it > -120f) { stats.directRssiSum += it; stats.directRssiCount++ } }
                     snr?.let { stats.directSnrSum += it; stats.directSnrCount++ }
-                    if (hops >= 0) { stats.directHopSum += hops; stats.directHopCount++ }
+                    if (hops >= 0) {
+                        stats.directHopSum += hops
+                        stats.directHopCount++
+                        if (hops == 0) stats.zeroHopCount++
+                    }
                 }
 
                 // Check if relayed BY one of my nodes
@@ -491,8 +495,12 @@ class MeshtasticMonitor {
                         } else true
                     }
 
-                    if (viable.isNotEmpty() && rssi != null && rssi > -120f) {
-                        for ((_, stats) in viable) {
+                    // If any viable candidates have 0-hop observations, prefer only those
+                    val zeroHopViable = viable.filter { (_, stats) -> stats.zeroHopCount > 0 }
+                    val toUpdate = if (zeroHopViable.isNotEmpty()) zeroHopViable else viable
+
+                    if (toUpdate.isNotEmpty() && rssi != null && rssi > -120f) {
+                        for ((_, stats) in toUpdate) {
                             stats.relayCount++
                             stats.lastSeenRelay = currentTime
                             stats.relayRssiSum += rssi
