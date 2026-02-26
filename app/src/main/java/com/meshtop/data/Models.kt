@@ -179,6 +179,32 @@ data class MessageInfo(
 )
 
 @Serializable
+data class TracerouteInfo(
+    @Serializable(with = InstantSerializer::class)
+    val timestamp: Instant,
+    val packetId: Int,
+    val fromId: Int,
+    val fromName: String,
+    val toId: Int,
+    val toName: String,
+    val gatewayId: String,
+    val gatewayName: String,
+    val rssi: Float?,
+    val snr: Float?,
+    val hopStart: Int,
+    val hopLimit: Int,
+    val route: List<Int>,
+    val routeNames: List<String>,
+    val snrTowards: List<Float>,
+    val routeBack: List<Int>,
+    val routeBackNames: List<String>,
+    val snrBack: List<Float>,
+) {
+    val isRoundTrip: Boolean get() = routeBack.isNotEmpty()
+    val forwardHops: Int get() = route.size + 1
+}
+
+@Serializable
 data class RelayNodeStats(
     val nodeId: Int,
     val shortName: String,
@@ -328,4 +354,5 @@ data class MonitorUiState(
     val dbLoaded: Boolean = false,
     val dbError: String? = null,
     val dbNodeCount: Int = 0,
+    val recentTraceroutes: List<TracerouteInfo> = emptyList(),
 )

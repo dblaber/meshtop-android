@@ -33,6 +33,7 @@ data class MonitorSnapshot(
     val relayNodeStats: Map<Int, Map<Int, RelayNodeStats>>,
     val recentPackets: List<PacketInfo>,
     val recentMessages: List<MessageInfo>,
+    val recentTraceroutes: List<TracerouteInfo> = emptyList(),
     val totalPackets: Int,
     val decryptedPackets: Int,
     val failedDecryptions: Int,
@@ -42,6 +43,7 @@ data class MonitorSnapshot(
 private const val TAG = "MeshtasticMonitor"
 private const val MAX_PACKETS = 200
 private const val MAX_MESSAGES = 100
+private const val MAX_TRACEROUTES = 100
 
 class MeshtasticMonitor {
 
@@ -60,6 +62,7 @@ class MeshtasticMonitor {
     private val relayNodeStats = mutableMapOf<Int, MutableMap<Int, RelayNodeStats>>()
     private val recentPackets = ArrayDeque<PacketInfo>(MAX_PACKETS + 10)
     private val recentMessages = ArrayDeque<MessageInfo>(MAX_MESSAGES + 10)
+    private val recentTraceroutes = ArrayDeque<TracerouteInfo>(MAX_TRACEROUTES + 10)
 
     // Stats
     private var totalPackets = 0
@@ -134,6 +137,7 @@ class MeshtasticMonitor {
         relayNodeStats.clear()
         recentPackets.clear()
         recentMessages.clear()
+        recentTraceroutes.clear()
         totalPackets = 0
         decryptedPackets = 0
         failedDecryptions = 0
@@ -585,6 +589,35 @@ class MeshtasticMonitor {
                     }
                 }
 
+                // Traceroutes
+                if (decoded != null && portnum == 70) { // TRACEROUTE_APP
+                    try {
+                        val rd = MeshProtos.RouteDiscovery.parseFrom(decoded.payload)
+                        val route = rd.routeList.map { it.toInt() }
+                        val snrTowards = rd.snrTowardsList.map { it / 4.0f }
+                        val routeBack = rd.routeBackList.map { it.toInt() }
+                        val snrBack = rd.snrBackList.map { it / 4.0f }
+                        fun resolveId(id: Int) = nodeNames[id] ?: "!%08x".format(id.toLong() and 0xFFFFFFFFL)
+                        val toName = if (toId.toLong() and 0xFFFFFFFFL == 0xFFFFFFFFL) "broadcast"
+                        else resolveId(toId)
+                        val traceroute = TracerouteInfo(
+                            timestamp = now,
+                            packetId = meshPacketId.toInt(),
+                            fromId = fromId, fromName = fromName,
+                            toId = toId, toName = toName,
+                            gatewayId = gatewayId, gatewayName = gatewayName,
+                            rssi = rssi, snr = snr,
+                            hopStart = hopStart, hopLimit = hopLimit,
+                            route = route, routeNames = route.map { resolveId(it) }, snrTowards = snrTowards,
+                            routeBack = routeBack, routeBackNames = routeBack.map { resolveId(it) }, snrBack = snrBack,
+                        )
+                        while (recentTraceroutes.size >= MAX_TRACEROUTES) recentTraceroutes.removeFirst()
+                        recentTraceroutes.addLast(traceroute)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to parse traceroute", e)
+                    }
+                }
+
                 // Add to recent packets
                 val pktInfo = PacketInfo(
                     timestamp = now,
@@ -706,6 +739,7 @@ class MeshtasticMonitor {
             relayNodeStats = relayNodeStats.mapValues { (_, v) -> v.toMap() },
             recentPackets = recentPackets.toList(),
             recentMessages = recentMessages.toList(),
+            recentTraceroutes = recentTraceroutes.toList(),
             totalPackets = totalPackets,
             decryptedPackets = decryptedPackets,
             failedDecryptions = failedDecryptions,
@@ -736,6 +770,8 @@ class MeshtasticMonitor {
         recentPackets.addAll(snapshot.recentPackets)
         recentMessages.clear()
         recentMessages.addAll(snapshot.recentMessages)
+        recentTraceroutes.clear()
+        recentTraceroutes.addAll(snapshot.recentTraceroutes)
         totalPackets = snapshot.totalPackets
         decryptedPackets = snapshot.decryptedPackets
         failedDecryptions = snapshot.failedDecryptions
@@ -760,6 +796,7 @@ class MeshtasticMonitor {
                 myNodes = myNodes.toMap(),
                 recentPackets = recentPackets.toList(),
                 recentMessages = recentMessages.toList(),
+                recentTraceroutes = recentTraceroutes.toList(),
                 relayNodeStats = relayNodeStats.mapValues { (_, v) -> v.toMap() },
                 hexToNodeId = hexToNodeId.toMap(),
                 gatewayNodeIds = gatewayNodeIds.toSet(),

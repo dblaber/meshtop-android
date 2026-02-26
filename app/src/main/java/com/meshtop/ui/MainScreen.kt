@@ -1,5 +1,6 @@
 package com.meshtop.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -21,7 +22,7 @@ import com.meshtop.data.MonitorUiState
 import com.meshtop.ui.theme.*
 import kotlinx.coroutines.launch
 
-private val TAB_TITLES = listOf("", "Msgs", "Gates", "Nodes", "Pkts")
+private val TAB_TITLES = listOf("", "Msgs", "Gates", "Nodes", "Pkts", "TR")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +42,8 @@ fun MainScreen(
     onHideMyNodesChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    BackHandler(enabled = showSettings) { onHideSettings() }
+
     if (showSettings) {
         SettingsScreen(
             settings = settings,
@@ -127,6 +130,7 @@ fun MainScreen(
                 2 -> GatewaysScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
                 3 -> MyNodesScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
                 4 -> PacketsScreen(state = state, getRelayName = getRelayName, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
+                5 -> TracerouteScreen(state = state)
             }
         }
     }

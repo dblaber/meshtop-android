@@ -73,15 +73,21 @@ class MonitorService : Service() {
     private fun observeMessages() {
         val monitor = (application as MeshtopApp).monitor
         scope.launch {
-            // Watch for changes in recentMessages list
+            var firstEmission = true
             monitor.state
                 .map { it.recentMessages }
                 .distinctUntilChanged()
                 .collectLatest { messages ->
+                    if (firstEmission) {
+                        // Seed all existing IDs silently — these are MQTT backlog or
+                        // restored session data, not genuinely new messages.
+                        firstEmission = false
+                        messages.forEach { notifiedPacketIds.add(it.packetId) }
+                        return@collectLatest
+                    }
                     for (msg in messages) {
                         if (msg.packetId in notifiedPacketIds) continue
                         notifiedPacketIds.add(msg.packetId)
-                        // Keep set bounded
                         if (notifiedPacketIds.size > 500) {
                             val oldest = notifiedPacketIds.take(250)
                             notifiedPacketIds.removeAll(oldest.toSet())
