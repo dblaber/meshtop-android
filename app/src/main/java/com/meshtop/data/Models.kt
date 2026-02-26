@@ -14,6 +14,21 @@ object InstantSerializer : KSerializer<Instant> {
     override fun deserialize(decoder: Decoder): Instant = Instant.ofEpochMilli(decoder.decodeLong())
 }
 
+@Serializable
+data class SignalBucket(
+    var packetCount: Int = 0,
+    var rssiSum: Double = 0.0,
+    var rssiCount: Int = 0,
+    var snrSum: Double = 0.0,
+    var snrCount: Int = 0,
+) {
+    fun addPacket(rssi: Float?, snr: Float?) {
+        packetCount++
+        rssi?.let { rssiSum += it; rssiCount++ }
+        snr?.let { snrSum += it; snrCount++ }
+    }
+}
+
 val PORTNUM_NAMES = mapOf(
     0 to "UNKNOWN",
     1 to "TEXT_MSG",
@@ -50,19 +65,35 @@ data class GatewayStats(
     var messageCount: Int = 0,
     var totalDirectCount: Int = 0,
     var totalRelayedCount: Int = 0,
-    var cleanDirectCount: Int = 0,
-    var cleanRelayedCount: Int = 0,
-    var cleanRssiSum: Double = 0.0,
-    var cleanRssiCount: Int = 0,
-    var cleanSnrSum: Double = 0.0,
-    var cleanSnrCount: Int = 0,
+    val signalAll: SignalBucket = SignalBucket(),
+    val signalGw: SignalBucket = SignalBucket(),
+    val signalMyNode: SignalBucket = SignalBucket(),
     val uniqueNodes: MutableSet<Int> = mutableSetOf(),
     @Serializable(with = InstantSerializer::class)
     var lastSeen: Instant? = null,
 ) {
-    val totalClean: Int get() = cleanDirectCount + cleanRelayedCount
-    val avgRssi: Double? get() = if (cleanRssiCount > 0) cleanRssiSum / cleanRssiCount else null
-    val avgSnr: Double? get() = if (cleanSnrCount > 0) cleanSnrSum / cleanSnrCount else null
+    fun filteredCount(hideGw: Boolean, hideMyNode: Boolean): Int {
+        var c = signalAll.packetCount
+        if (hideGw) c -= signalGw.packetCount
+        if (hideMyNode) c -= signalMyNode.packetCount
+        return c.coerceAtLeast(0)
+    }
+
+    fun avgRssi(hideGw: Boolean = false, hideMyNode: Boolean = false): Double? {
+        var sum = signalAll.rssiSum
+        var count = signalAll.rssiCount
+        if (hideGw) { sum -= signalGw.rssiSum; count -= signalGw.rssiCount }
+        if (hideMyNode) { sum -= signalMyNode.rssiSum; count -= signalMyNode.rssiCount }
+        return if (count > 0) sum / count else null
+    }
+
+    fun avgSnr(hideGw: Boolean = false, hideMyNode: Boolean = false): Double? {
+        var sum = signalAll.snrSum
+        var count = signalAll.snrCount
+        if (hideGw) { sum -= signalGw.snrSum; count -= signalGw.snrCount }
+        if (hideMyNode) { sum -= signalMyNode.snrSum; count -= signalMyNode.snrCount }
+        return if (count > 0) sum / count else null
+    }
 }
 
 @Serializable
@@ -81,13 +112,30 @@ data class NodeStats(
     var snrCount: Int = 0,
     var hopSum: Int = 0,
     var hopCount: Int = 0,
+    val signalAll: SignalBucket = SignalBucket(),
+    val signalGw: SignalBucket = SignalBucket(),
+    val signalMyNode: SignalBucket = SignalBucket(),
     val gatewaysHeardBy: MutableSet<String> = mutableSetOf(),
     @Serializable(with = InstantSerializer::class)
     var lastSeen: Instant? = null,
 ) {
-    val avgRssi: Double? get() = if (rssiCount > 0) rssiSum / rssiCount else null
-    val avgSnr: Double? get() = if (snrCount > 0) snrSum / snrCount else null
     val avgHops: Double? get() = if (hopCount > 0) hopSum.toDouble() / hopCount else null
+
+    fun avgRssi(hideGw: Boolean = false, hideMyNode: Boolean = false): Double? {
+        var sum = signalAll.rssiSum
+        var count = signalAll.rssiCount
+        if (hideGw) { sum -= signalGw.rssiSum; count -= signalGw.rssiCount }
+        if (hideMyNode) { sum -= signalMyNode.rssiSum; count -= signalMyNode.rssiCount }
+        return if (count > 0) sum / count else null
+    }
+
+    fun avgSnr(hideGw: Boolean = false, hideMyNode: Boolean = false): Double? {
+        var sum = signalAll.snrSum
+        var count = signalAll.snrCount
+        if (hideGw) { sum -= signalGw.snrSum; count -= signalGw.snrCount }
+        if (hideMyNode) { sum -= signalMyNode.snrSum; count -= signalMyNode.snrCount }
+        return if (count > 0) sum / count else null
+    }
 }
 
 @Serializable
@@ -273,6 +321,8 @@ data class MonitorUiState(
     val recentMessages: List<MessageInfo> = emptyList(),
     val relayNodeStats: Map<Int, Map<Int, RelayNodeStats>> = emptyMap(),
     val hexToNodeId: Map<String, Int> = emptyMap(),
+    val gatewayNodeIds: Set<Int> = emptySet(),
+    val myNodeIds: Set<Int> = emptySet(),
     val dbConfigured: Boolean = false,
     val dbConnecting: Boolean = false,
     val dbLoaded: Boolean = false,

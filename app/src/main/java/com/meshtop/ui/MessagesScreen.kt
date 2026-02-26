@@ -35,9 +35,20 @@ private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(Zon
 fun MessagesScreen(
     state: MonitorUiState,
     getRelayName: (Int) -> String,
+    hideGateways: Boolean = false,
+    hideMyNodes: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val messages = state.recentMessages
+    val excludedIds = remember(hideGateways, hideMyNodes, state.gatewayNodeIds, state.myNodeIds) {
+        buildSet {
+            if (hideGateways) addAll(state.gatewayNodeIds)
+            if (hideMyNodes) addAll(state.myNodeIds)
+        }
+    }
+    val messages = remember(state.recentMessages, excludedIds) {
+        if (excludedIds.isEmpty()) state.recentMessages
+        else state.recentMessages.filter { it.fromId !in excludedIds }
+    }
     var selectedMessage by remember { mutableStateOf<GroupedMessage?>(null) }
 
     // Group by packetId to show unique messages

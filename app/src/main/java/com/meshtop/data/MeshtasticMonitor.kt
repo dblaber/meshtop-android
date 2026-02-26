@@ -394,13 +394,7 @@ class MeshtasticMonitor {
                 hexToNodeId[gatewayId]?.let { gatewayNodeIds.add(it) }
 
                 val fromIsGateway = fromId in gatewayNodeIds
-
-                // Determine if packet is "clean"
-                val isClean = if (!fromIsGateway) {
-                    if (hops == 0) true
-                    else if (hops > 0) relayNode == 0 || relayNode !in myNodeLastBytes
-                    else false
-                } else false
+                val fromIsMyNode = !fromIsGateway && fromName.lowercase() in myNodesLower
 
                 // Update gateway stats
                 val gw = gateways.getOrPut(gatewayId) { GatewayStats(gatewayId) }
@@ -414,18 +408,13 @@ class MeshtasticMonitor {
                 if (hops == 0) gw.totalDirectCount++
                 else if (hops > 0) gw.totalRelayedCount++
 
-                if (isClean) {
-                    if (hops == 0) gw.cleanDirectCount++
-                    else if (hops > 0) gw.cleanRelayedCount++
+                // Accumulate signal into all bucket
+                gw.signalAll.addPacket(rssi, snr)
 
-                    rssi?.let {
-                        gw.cleanRssiSum += it
-                        gw.cleanRssiCount++
-                    }
-                    snr?.let {
-                        gw.cleanSnrSum += it
-                        gw.cleanSnrCount++
-                    }
+                // Categorize source into gateway or my-node bucket
+                when {
+                    fromIsGateway -> gw.signalGw.addPacket(rssi, snr)
+                    fromIsMyNode -> gw.signalMyNode.addPacket(rssi, snr)
                 }
 
                 // Check if from a tracked node
@@ -454,6 +443,19 @@ class MeshtasticMonitor {
 
                     rssi?.let { n.rssiSum += it; n.rssiCount++ }
                     snr?.let { n.snrSum += it; n.snrCount++ }
+
+                    // Accumulate signal buckets for node stats
+                    // Categorize by receiving gateway: if gateway is one of our nodes,
+                    // this is inter-my-node traffic that we may want to filter out
+                    val gwNodeId = hexToNodeId[gatewayId]
+                    val gwIsGateway = gwNodeId != null && gwNodeId in gatewayNodeIds
+                    val gwIsMyNode = !gwIsGateway && gwNodeId != null &&
+                            (nodeNames[gwNodeId]?.lowercase() ?: "") in myNodesLower
+                    n.signalAll.addPacket(rssi, snr)
+                    when {
+                        gwIsGateway -> n.signalGw.addPacket(rssi, snr)
+                        gwIsMyNode -> n.signalMyNode.addPacket(rssi, snr)
+                    }
 
                     // Track last byte for relay filtering
                     if (fromId != 0) myNodeLastBytes.add(fromId and 0xFF)
@@ -753,13 +755,15 @@ class MeshtasticMonitor {
                 failedDecryptions = failedDecryptions,
                 uptimeMillis = System.currentTimeMillis() - startTime,
                 gateways = gateways.values
-                    .sortedByDescending { it.totalClean }
+                    .sortedByDescending { it.signalAll.packetCount }
                     .toList(),
                 myNodes = myNodes.toMap(),
                 recentPackets = recentPackets.toList(),
                 recentMessages = recentMessages.toList(),
                 relayNodeStats = relayNodeStats.mapValues { (_, v) -> v.toMap() },
                 hexToNodeId = hexToNodeId.toMap(),
+                gatewayNodeIds = gatewayNodeIds.toSet(),
+                myNodeIds = myNodes.values.map { it.nodeId }.filter { it != 0 }.toSet(),
                 dbConfigured = dbConfigured,
                 dbConnecting = dbConnecting,
                 dbLoaded = dbLoaded,

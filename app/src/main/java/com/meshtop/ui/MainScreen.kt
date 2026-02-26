@@ -29,12 +29,16 @@ fun MainScreen(
     state: MonitorUiState,
     settings: ConnectionSettings,
     showSettings: Boolean,
+    hideGateways: Boolean,
+    hideMyNodes: Boolean,
     getRelayName: (Int) -> String,
     onToggleSettings: () -> Unit,
     onHideSettings: () -> Unit,
     onSaveSettings: (ConnectionSettings) -> Unit,
     onReconnect: () -> Unit,
     onClearStorage: () -> Unit,
+    onHideGatewaysChange: (Boolean) -> Unit,
+    onHideMyNodesChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (showSettings) {
@@ -57,8 +61,14 @@ fun MainScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Stats header (always visible)
-        StatsHeader(state = state)
+        // Stats header (always visible, includes filter toggles)
+        StatsHeader(
+            state = state,
+            hideGateways = hideGateways,
+            hideMyNodes = hideMyNodes,
+            onHideGatewaysChange = onHideGatewaysChange,
+            onHideMyNodesChange = onHideMyNodesChange,
+        )
 
         // Tab row
         TabRow(
@@ -112,11 +122,11 @@ fun MainScreen(
             userScrollEnabled = false,
         ) { page ->
             when (page) {
-                0 -> SummaryScreen(state = state)
-                1 -> MessagesScreen(state = state, getRelayName = getRelayName)
-                2 -> GatewaysScreen(state = state)
-                3 -> MyNodesScreen(state = state)
-                4 -> PacketsScreen(state = state, getRelayName = getRelayName)
+                0 -> SummaryScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
+                1 -> MessagesScreen(state = state, getRelayName = getRelayName, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
+                2 -> GatewaysScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
+                3 -> MyNodesScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
+                4 -> PacketsScreen(state = state, getRelayName = getRelayName, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
             }
         }
     }

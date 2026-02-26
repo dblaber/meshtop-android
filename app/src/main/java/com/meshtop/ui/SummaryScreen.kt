@@ -7,8 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,25 +38,17 @@ private val PortnumColors = mapOf(
 private val DefaultBarColor = TextDim
 
 @Composable
-fun SummaryScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
-    var hideGateways by remember { mutableStateOf(false) }
-    var hideMyNodes by remember { mutableStateOf(false) }
-
-    // Derive excluded node IDs from toggles
-    val gatewayNodeIds by remember(state.gateways, state.hexToNodeId) {
-        derivedStateOf {
-            state.gateways.mapNotNull { gw -> state.hexToNodeId[gw.gatewayId] }.toSet()
-        }
-    }
-    val myNodeIds by remember(state.myNodes) {
-        derivedStateOf { state.myNodes.values.map { it.nodeId }.toSet() }
-    }
-
-    val excludedIds by remember(hideGateways, hideMyNodes, gatewayNodeIds, myNodeIds) {
+fun SummaryScreen(
+    state: MonitorUiState,
+    hideGateways: Boolean = false,
+    hideMyNodes: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    val excludedIds by remember(hideGateways, hideMyNodes, state.gatewayNodeIds, state.myNodeIds) {
         derivedStateOf {
             buildSet {
-                if (hideGateways) addAll(gatewayNodeIds)
-                if (hideMyNodes) addAll(myNodeIds)
+                if (hideGateways) addAll(state.gatewayNodeIds)
+                if (hideMyNodes) addAll(state.myNodeIds)
             }
         }
     }
@@ -83,67 +73,12 @@ fun SummaryScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
         contentPadding = PaddingValues(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item { FilterToggles(hideGateways, hideMyNodes, { hideGateways = it }, { hideMyNodes = it }) }
         item { NetworkOverview(state, filteredPackets, filteredMessages) }
         item { PacketTypesChart(filteredPackets) }
         item { SignalQualityChart(filteredPackets) }
         item { HopDistributionChart(filteredPackets) }
-        item { TopGatewaysChart(state) }
+        item { TopGatewaysChart(state, hideGateways, hideMyNodes) }
         item { TopNodesChart(filteredPackets) }
-    }
-}
-
-// ── Filter toggles ──────────────────────────────────────────────────
-
-@Composable
-private fun FilterToggles(
-    hideGateways: Boolean,
-    hideMyNodes: Boolean,
-    onHideGatewaysChange: (Boolean) -> Unit,
-    onHideMyNodesChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        FilterToggle("Hide gateways", hideGateways, onHideGatewaysChange, Modifier.weight(1f))
-        FilterToggle("Hide my nodes", hideMyNodes, onHideMyNodesChange, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun FilterToggle(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .background(SurfaceCard, RoundedCornerShape(6.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            fontFamily = Mono,
-            fontSize = 11.sp,
-            color = if (checked) FirstHearerCyan else TextDim,
-            modifier = Modifier.weight(1f),
-        )
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = FirstHearerCyan,
-                checkedTrackColor = FirstHearerCyan.copy(alpha = 0.3f),
-                uncheckedThumbColor = TextDim,
-                uncheckedTrackColor = SurfaceDark,
-                uncheckedBorderColor = TextDim.copy(alpha = 0.3f),
-            ),
-            modifier = Modifier.height(28.dp),
-        )
     }
 }
 
@@ -369,21 +304,22 @@ private fun HopDistributionChart(packets: List<PacketInfo>) {
 // ── Section 5: Top Gateways ─────────────────────────────────────────
 
 @Composable
-private fun TopGatewaysChart(state: MonitorUiState) {
+private fun TopGatewaysChart(state: MonitorUiState, hideGw: Boolean = false, hideMyNode: Boolean = false) {
     val top = state.gateways
-        .sortedByDescending { it.packetCount }
+        .sortedByDescending { it.filteredCount(hideGw, hideMyNode) }
         .take(5)
 
     SummaryCard(title = "Top Gateways") {
         if (top.isEmpty()) {
             Text("No gateways yet", fontFamily = Mono, fontSize = 12.sp, color = TextDim)
         } else {
-            val maxPkts = top.first().packetCount.coerceAtLeast(1)
+            val maxPkts = top.first().filteredCount(hideGw, hideMyNode).coerceAtLeast(1)
             top.forEach { gw ->
                 val name = gw.shortName.ifBlank { gw.gatewayId.takeLast(4) }
+                val count = gw.filteredCount(hideGw, hideMyNode)
                 HorizontalBarRow(
                     label = name,
-                    value = gw.packetCount,
+                    value = count,
                     maxValue = maxPkts,
                     barColor = HeaderBlue,
                     suffix = " (${gw.uniqueNodes.size}n)",

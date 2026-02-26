@@ -27,7 +27,12 @@ import java.time.format.DateTimeFormatter
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
 
 @Composable
-fun MyNodesScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
+fun MyNodesScreen(
+    state: MonitorUiState,
+    hideGateways: Boolean = false,
+    hideMyNodes: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
     val nodes = state.myNodes.entries
         .sortedBy { it.key }
         .map { (key, node) -> key to node }
@@ -77,7 +82,7 @@ fun MyNodesScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(nodes) { (key, node) ->
-                        NodeRow(key, node, onTap = {
+                        NodeRow(key, node, hideGateways, hideMyNodes, onTap = {
                             if (node != null && node.packetCount > 0) {
                                 selectedNode = key to node
                             }
@@ -95,7 +100,7 @@ fun MyNodesScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun NodeRow(key: String, node: NodeStats?, onTap: () -> Unit) {
+private fun NodeRow(key: String, node: NodeStats?, hideGw: Boolean, hideMyNode: Boolean, onTap: () -> Unit) {
     Row(
         modifier = Modifier
             .clickable(onClick = onTap)
@@ -103,8 +108,8 @@ private fun NodeRow(key: String, node: NodeStats?, onTap: () -> Unit) {
     ) {
         if (node != null && node.packetCount > 0) {
             val lastByte = if (node.nodeId != 0) String.format("%02x", node.nodeId and 0xFF) else "-"
-            val rssiStr = node.avgRssi?.let { "%.0f".format(it) } ?: "-"
-            val snrStr = node.avgSnr?.let { "%.1f".format(it) } ?: "-"
+            val rssiStr = node.avgRssi(hideGw, hideMyNode)?.let { "%.0f".format(it) } ?: "-"
+            val snrStr = node.avgSnr(hideGw, hideMyNode)?.let { "%.1f".format(it) } ?: "-"
             val hopsStr = node.avgHops?.let { "%.1f".format(it) } ?: "-"
             val lastSeen = node.lastSeen?.let { timeFormatter.format(it) } ?: "-"
             val gwCount = node.gatewaysHeardBy.size.toString()
@@ -215,8 +220,8 @@ private fun NodeDetailDialog(
                 NodeDetailRow("Messages", "${node.messageCount}")
 
                 NodeSectionHeader("Signal Stats")
-                NodeDetailRow("Avg RSSI", node.avgRssi?.let { "%.1f dBm".format(it) } ?: "-")
-                NodeDetailRow("Avg SNR", node.avgSnr?.let { "%.1f dB".format(it) } ?: "-")
+                NodeDetailRow("Avg RSSI", node.avgRssi()?.let { "%.1f dBm".format(it) } ?: "-")
+                NodeDetailRow("Avg SNR", node.avgSnr()?.let { "%.1f dB".format(it) } ?: "-")
                 NodeDetailRow("Avg Hops", node.avgHops?.let { "%.2f".format(it) } ?: "-")
 
                 if (node.gatewaysHeardBy.isNotEmpty()) {

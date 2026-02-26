@@ -32,9 +32,20 @@ private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(Zon
 fun PacketsScreen(
     state: MonitorUiState,
     getRelayName: (Int) -> String,
+    hideGateways: Boolean = false,
+    hideMyNodes: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val packets = state.recentPackets
+    val excludedIds = remember(hideGateways, hideMyNodes, state.gatewayNodeIds, state.myNodeIds) {
+        buildSet {
+            if (hideGateways) addAll(state.gatewayNodeIds)
+            if (hideMyNodes) addAll(state.myNodeIds)
+        }
+    }
+    val packets = remember(state.recentPackets, excludedIds) {
+        if (excludedIds.isEmpty()) state.recentPackets
+        else state.recentPackets.filter { it.fromId !in excludedIds }
+    }
     val scrollState = rememberScrollState()
     var selectedPacket by remember { mutableStateOf<PacketInfo?>(null) }
 

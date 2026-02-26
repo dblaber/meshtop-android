@@ -33,6 +33,12 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
     private val _showSettings = MutableStateFlow(false)
     val showSettings: StateFlow<Boolean> = _showSettings.asStateFlow()
 
+    private val _hideGateways = MutableStateFlow(false)
+    val hideGateways: StateFlow<Boolean> = _hideGateways.asStateFlow()
+
+    private val _hideMyNodes = MutableStateFlow(false)
+    val hideMyNodes: StateFlow<Boolean> = _hideMyNodes.asStateFlow()
+
     private var saveJob: Job? = null
 
     init {
@@ -120,6 +126,9 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
             monitor.connect(s)
         }
     }
+
+    fun setHideGateways(value: Boolean) { _hideGateways.value = value }
+    fun setHideMyNodes(value: Boolean) { _hideMyNodes.value = value }
 
     fun toggleSettings() {
         _showSettings.value = !_showSettings.value

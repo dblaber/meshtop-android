@@ -3,6 +3,9 @@ package com.meshtop.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -15,7 +18,14 @@ import com.meshtop.data.MonitorUiState
 import com.meshtop.ui.theme.*
 
 @Composable
-fun StatsHeader(state: MonitorUiState, modifier: Modifier = Modifier) {
+fun StatsHeader(
+    state: MonitorUiState,
+    hideGateways: Boolean = false,
+    hideMyNodes: Boolean = false,
+    onHideGatewaysChange: (Boolean) -> Unit = {},
+    onHideMyNodesChange: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val uptimeSeconds = state.uptimeMillis / 1000
     val hours = uptimeSeconds / 3600
     val minutes = (uptimeSeconds % 3600) / 60
@@ -84,6 +94,19 @@ fun StatsHeader(state: MonitorUiState, modifier: Modifier = Modifier) {
             StatChip("${"%.1f".format(rate)}/s", null, StatMagenta)
             StatChip(uptimeStr, null, HeaderBlue)
         }
+
+        // Row 3: Filter toggles
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilterToggle("Hide GWs", hideGateways, onHideGatewaysChange, Modifier.weight(1f))
+            FilterToggle("Hide Nodes", hideMyNodes, onHideMyNodesChange, Modifier.weight(1f))
+        }
     }
 }
 
@@ -102,6 +125,41 @@ private fun StatusDot(text: String, color: androidx.compose.ui.graphics.Color) {
             color = color,
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp,
+        )
+    }
+}
+
+@Composable
+private fun FilterToggle(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .background(SurfaceDark, RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            fontFamily = Mono,
+            fontSize = 11.sp,
+            color = if (checked) FirstHearerCyan else TextDim,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = FirstHearerCyan,
+                checkedTrackColor = FirstHearerCyan.copy(alpha = 0.3f),
+                uncheckedThumbColor = TextDim,
+                uncheckedTrackColor = SurfaceDark,
+                uncheckedBorderColor = TextDim.copy(alpha = 0.3f),
+            ),
+            modifier = Modifier.height(24.dp),
         )
     }
 }

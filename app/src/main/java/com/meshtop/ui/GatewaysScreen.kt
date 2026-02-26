@@ -31,8 +31,13 @@ import java.time.format.DateTimeFormatter
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
 
 @Composable
-fun GatewaysScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
-    val gateways = state.gateways
+fun GatewaysScreen(
+    state: MonitorUiState,
+    hideGateways: Boolean = false,
+    hideMyNodes: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    val gateways = state.gateways.sortedByDescending { it.filteredCount(hideGateways, hideMyNodes) }
     val scrollState = rememberScrollState()
     var selectedGateway by remember { mutableStateOf<GatewayStats?>(null) }
 
@@ -56,9 +61,7 @@ fun GatewaysScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
                 HeaderCell("Tot", 48.dp)
                 HeaderCell("TDir", 48.dp)
                 HeaderCell("TRly", 48.dp)
-                HeaderCell("CDir", 48.dp)
-                HeaderCell("CRly", 48.dp)
-                HeaderCell("TCln", 48.dp)
+                HeaderCell("Filt", 48.dp)
                 HeaderCell("RSSI", 48.dp)
                 HeaderCell("SNR", 45.dp)
                 HeaderCell("Nodes", 48.dp)
@@ -79,7 +82,7 @@ fun GatewaysScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(gateways.take(25)) { index, gw ->
-                        GatewayRow(gw, state.hexToNodeId, index, onTap = { selectedGateway = gw })
+                        GatewayRow(gw, state.hexToNodeId, index, hideGateways, hideMyNodes, onTap = { selectedGateway = gw })
                         HorizontalDivider(color = Color(0xFF1A1A33), thickness = 0.5.dp)
                     }
                 }
@@ -93,13 +96,21 @@ fun GatewaysScreen(state: MonitorUiState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun GatewayRow(gw: GatewayStats, hexToNodeId: Map<String, Int>, index: Int, onTap: () -> Unit) {
+private fun GatewayRow(
+    gw: GatewayStats,
+    hexToNodeId: Map<String, Int>,
+    index: Int,
+    hideGw: Boolean,
+    hideMyNode: Boolean,
+    onTap: () -> Unit,
+) {
     val name = gw.shortName.ifEmpty { gw.gatewayId.take(10) }
     val lastByte = hexToNodeId[gw.gatewayId]?.let { String.format("%02x", it and 0xFF) } ?: "-"
-    val rssiStr = gw.avgRssi?.let { "%.0f".format(it) } ?: "-"
-    val snrStr = gw.avgSnr?.let { "%.1f".format(it) } ?: "-"
+    val rssiStr = gw.avgRssi(hideGw, hideMyNode)?.let { "%.0f".format(it) } ?: "-"
+    val snrStr = gw.avgSnr(hideGw, hideMyNode)?.let { "%.1f".format(it) } ?: "-"
     val lastSeen = gw.lastSeen?.let { timeFormatter.format(it) } ?: "-"
     val nodeCount = gw.uniqueNodes.size.toString()
+    val filteredCount = gw.filteredCount(hideGw, hideMyNode)
 
     val rowColor = if (index % 2 == 0) Color(0xFF12122A) else Color.Transparent
 
@@ -114,9 +125,7 @@ private fun GatewayRow(gw: GatewayStats, hexToNodeId: Map<String, Int>, index: I
         DataCell("${gw.packetCount}", 48.dp)
         DataCell("${gw.totalDirectCount}", 48.dp, DirectGreen)
         DataCell("${gw.totalRelayedCount}", 48.dp, RelayOrange)
-        DataCell("${gw.cleanDirectCount}", 48.dp)
-        DataCell("${gw.cleanRelayedCount}", 48.dp)
-        DataCell("${gw.totalClean}", 48.dp, FirstHearerCyan, FontWeight.Bold)
+        DataCell("$filteredCount", 48.dp, FirstHearerCyan, FontWeight.Bold)
         DataCell(rssiStr, 48.dp)
         DataCell(snrStr, 45.dp)
         DataCell(nodeCount, 48.dp, StatMagenta)
@@ -195,11 +204,9 @@ private fun GatewayDetailDialog(
                 GwDetailRow("Messages", "${gw.messageCount}")
                 GwDetailRow("Total Dir", "${gw.totalDirectCount}")
                 GwDetailRow("Total Rly", "${gw.totalRelayedCount}")
-                GwDetailRow("Clean Dir", "${gw.cleanDirectCount}")
-                GwDetailRow("Clean Rly", "${gw.cleanRelayedCount}")
-                GwDetailRow("Total Cln", "${gw.totalClean}")
-                GwDetailRow("Avg RSSI", gw.avgRssi?.let { "%.1f dBm".format(it) } ?: "-")
-                GwDetailRow("Avg SNR", gw.avgSnr?.let { "%.1f dB".format(it) } ?: "-")
+                GwDetailRow("Filtered", "${gw.filteredCount(false, false)}")
+                GwDetailRow("Avg RSSI", gw.avgRssi()?.let { "%.1f dBm".format(it) } ?: "-")
+                GwDetailRow("Avg SNR", gw.avgSnr()?.let { "%.1f dB".format(it) } ?: "-")
                 GwDetailRow("Uniq Nodes", "${gw.uniqueNodes.size}")
 
                 if (portBreakdown.isNotEmpty()) {
