@@ -11,16 +11,21 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.meshtop.data.PROTO_VERSION
 import com.meshtop.ui.MainScreen
 import com.meshtop.ui.theme.*
 import com.meshtop.viewmodel.MonitorViewModel
@@ -50,6 +55,27 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.state.collectAsState()
                 val settings by viewModel.settings.collectAsState()
                 val showSettings by viewModel.showSettings.collectAsState()
+                val hideGateways by viewModel.hideGateways.collectAsState()
+                val hideMyNodes by viewModel.hideMyNodes.collectAsState()
+                var showAbout by remember { mutableStateOf(false) }
+
+                if (showAbout) {
+                    AlertDialog(
+                        onDismissRequest = { showAbout = false },
+                        title = { Text("meshtop", fontFamily = Mono, fontWeight = FontWeight.Bold) },
+                        text = {
+                            Text(
+                                "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
+                                "Built ${BuildConfig.BUILD_DATE}\n" +
+                                "Proto $PROTO_VERSION",
+                                fontFamily = Mono,
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showAbout = false }) { Text("OK") }
+                        },
+                    )
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -72,6 +98,14 @@ class MainActivity : ComponentActivity() {
                                         tint = if (state.connected) TextDim else ErrorRed,
                                     )
                                 }
+                                // About button
+                                IconButton(onClick = { showAbout = true }) {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = "About",
+                                        tint = TextDim,
+                                    )
+                                }
                                 // Settings button
                                 IconButton(onClick = viewModel::toggleSettings) {
                                     Icon(
@@ -92,12 +126,16 @@ class MainActivity : ComponentActivity() {
                         state = state,
                         settings = settings,
                         showSettings = showSettings,
+                        hideGateways = hideGateways,
+                        hideMyNodes = hideMyNodes,
                         getRelayName = viewModel::getRelayNodeName,
                         onToggleSettings = viewModel::toggleSettings,
                         onHideSettings = viewModel::hideSettings,
                         onSaveSettings = viewModel::updateSettings,
                         onReconnect = viewModel::reconnect,
                         onClearStorage = viewModel::clearStorage,
+                        onHideGatewaysChange = viewModel::setHideGateways,
+                        onHideMyNodesChange = viewModel::setHideMyNodes,
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
