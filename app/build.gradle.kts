@@ -1,6 +1,21 @@
 import java.text.SimpleDateFormat
 import java.util.Date
 
+fun gitExec(vararg args: String): String = try {
+    val process = ProcessBuilder(*args)
+        .directory(rootProject.projectDir)
+        .redirectErrorStream(true)
+        .start()
+    process.inputStream.bufferedReader().readText().trim()
+        .also { process.waitFor() }
+} catch (_: Exception) { "" }
+
+// "v1.2.3" on a tag, "v1.2.3-5-gabcdef" between tags, commit hash if no tags
+val gitVersionName = gitExec("git", "describe", "--tags", "--always").ifEmpty { "dev" }
+// Count all reachable commits for a monotonically increasing versionCode
+val gitVersionCode = gitExec("git", "rev-list", "--count", "HEAD").toIntOrNull() ?: 1
+val gitCommitHash = gitExec("git", "rev-parse", "--short", "HEAD").ifEmpty { "unknown" }
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -17,9 +32,10 @@ android {
         applicationId = "com.meshtop"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = gitVersionCode
+        versionName = gitVersionName
         buildConfigField("String", "BUILD_DATE", "\"${SimpleDateFormat("yyyy-MM-dd").format(Date())}\"")
+        buildConfigField("String", "GIT_COMMIT", "\"$gitCommitHash\"")
 
     }
 

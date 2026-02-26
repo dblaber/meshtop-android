@@ -65,9 +65,10 @@ class MainActivity : ComponentActivity() {
                         title = { Text("meshtop", fontFamily = Mono, fontWeight = FontWeight.Bold) },
                         text = {
                             Text(
-                                "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
-                                "Built ${BuildConfig.BUILD_DATE}\n" +
-                                "Proto $PROTO_VERSION",
+                                "Version  ${BuildConfig.VERSION_NAME}\n" +
+                                "Commit   ${BuildConfig.GIT_COMMIT}\n" +
+                                "Built    ${BuildConfig.BUILD_DATE}\n" +
+                                "Proto    $PROTO_VERSION",
                                 fontFamily = Mono,
                             )
                         },
