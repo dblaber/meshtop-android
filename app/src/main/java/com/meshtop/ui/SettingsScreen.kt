@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.text.input.KeyboardType
@@ -28,19 +29,19 @@ fun SettingsScreen(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var broker by remember(settings) { mutableStateOf(settings.broker) }
-    var port by remember(settings) { mutableStateOf(settings.port.toString()) }
-    var username by remember(settings) { mutableStateOf(settings.username) }
-    var password by remember(settings) { mutableStateOf(settings.password) }
-    var topic by remember(settings) { mutableStateOf(settings.topic) }
-    var myNodes by remember(settings) { mutableStateOf(settings.myNodes.joinToString(", ")) }
-    var persistSession by remember(settings) { mutableStateOf(settings.persistSession) }
+    var broker by rememberSaveable { mutableStateOf(settings.broker) }
+    var port by rememberSaveable { mutableStateOf(settings.port.toString()) }
+    var username by rememberSaveable { mutableStateOf(settings.username) }
+    var password by rememberSaveable { mutableStateOf(settings.password) }
+    var topic by rememberSaveable { mutableStateOf(settings.topic) }
+    var myNodes by rememberSaveable { mutableStateOf(settings.myNodes.joinToString(", ")) }
+    var persistSession by rememberSaveable { mutableStateOf(settings.persistSession) }
 
-    var dbHost by remember(settings) { mutableStateOf(settings.dbHost) }
-    var dbPort by remember(settings) { mutableStateOf(settings.dbPort.toString()) }
-    var dbName by remember(settings) { mutableStateOf(settings.dbName) }
-    var dbUser by remember(settings) { mutableStateOf(settings.dbUser) }
-    var dbPassword by remember(settings) { mutableStateOf(settings.dbPassword) }
+    var dbHost by rememberSaveable { mutableStateOf(settings.dbHost) }
+    var dbPort by rememberSaveable { mutableStateOf(settings.dbPort.toString()) }
+    var dbName by rememberSaveable { mutableStateOf(settings.dbName) }
+    var dbUser by rememberSaveable { mutableStateOf(settings.dbUser) }
+    var dbPassword by rememberSaveable { mutableStateOf(settings.dbPassword) }
 
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -143,7 +144,24 @@ fun SettingsScreen(
         }
 
         OutlinedButton(
-            onClick = onClearStorage,
+            onClick = {
+                val current = ConnectionSettings(
+                    broker = broker.trim(),
+                    port = port.trim().toIntOrNull() ?: 1883,
+                    username = username.trim(),
+                    password = password.trim(),
+                    topic = topic.trim(),
+                    myNodes = myNodes.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
+                    persistSession = persistSession,
+                    dbHost = dbHost.trim(),
+                    dbPort = dbPort.trim().toIntOrNull() ?: 5432,
+                    dbName = dbName.trim(),
+                    dbUser = dbUser.trim(),
+                    dbPassword = dbPassword.trim(),
+                )
+                onSave(current)
+                onClearStorage()
+            },
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.error,
             ),
