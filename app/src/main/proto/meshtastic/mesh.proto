@@ -32,6 +32,9 @@ message User {
   string id = 1;
   string long_name = 2;
   string short_name = 3;
+  // field 4 = macaddr, 5 = hw_model, 6 = is_licensed (skipped)
+  // role matches Config.DeviceConfig.Role: 0=CLIENT, 1=CLIENT_MUTE, 2=ROUTER, 3=ROUTER_CLIENT, 4=REPEATER
+  int32 role = 7;
 }
 
 message RouteDiscovery {

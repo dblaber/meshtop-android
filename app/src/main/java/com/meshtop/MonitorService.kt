@@ -27,6 +27,11 @@ class MonitorService : Service() {
     override fun onCreate() {
         super.onCreate()
 
+        // Restore previously notified IDs so restarts don't re-notify old messages
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val saved = prefs.getStringSet(KEY_NOTIFIED_IDS, emptySet()) ?: emptySet()
+        notifiedPacketIds.addAll(saved.mapNotNull { it.toIntOrNull() })
+
         // Acquire partial wake lock to keep MQTT alive when screen is off
         val pm = getSystemService(PowerManager::class.java)
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "meshtop::mqtt").apply {
@@ -85,14 +90,21 @@ class MonitorService : Service() {
                         messages.forEach { notifiedPacketIds.add(it.packetId) }
                         return@collectLatest
                     }
+                    var changed = false
                     for (msg in messages) {
                         if (msg.packetId in notifiedPacketIds) continue
                         notifiedPacketIds.add(msg.packetId)
+                        changed = true
+                        fireMessageNotification(msg)
+                    }
+                    if (changed) {
                         if (notifiedPacketIds.size > 500) {
                             val oldest = notifiedPacketIds.take(250)
                             notifiedPacketIds.removeAll(oldest.toSet())
                         }
-                        fireMessageNotification(msg)
+                        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                            .putStringSet(KEY_NOTIFIED_IDS, notifiedPacketIds.map { it.toString() }.toSet())
+                            .apply()
                     }
                 }
         }
@@ -173,5 +185,7 @@ class MonitorService : Service() {
 
     companion object {
         const val NOTIFICATION_ID_SERVICE = 1
+        private const val PREFS_NAME = "meshtop_notif"
+        private const val KEY_NOTIFIED_IDS = "notified_ids"
     }
 }

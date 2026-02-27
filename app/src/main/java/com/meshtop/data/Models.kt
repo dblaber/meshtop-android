@@ -355,4 +355,9 @@ data class MonitorUiState(
     val dbError: String? = null,
     val dbNodeCount: Int = 0,
     val recentTraceroutes: List<TracerouteInfo> = emptyList(),
+    val legacyRelayTotal: Int = 0,
+    val legacyRelayAvgRssi: Double? = null,
+    val legacyRelayAvgSnr: Double? = null,
+    val clientMuteNodeIds: Set<Int> = emptySet(),
+    val nodeRoles: Map<Int, Int> = emptyMap(),
 )

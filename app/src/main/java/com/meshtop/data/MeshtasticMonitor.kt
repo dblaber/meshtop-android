@@ -31,9 +31,15 @@ data class MonitorSnapshot(
     val myNodeLastBytes: Set<Int>,
     val lastByteToNames: Map<Int, List<String>>,
     val relayNodeStats: Map<Int, Map<Int, RelayNodeStats>>,
+    val nodeRoles: Map<Int, Int> = emptyMap(),
     val recentPackets: List<PacketInfo>,
     val recentMessages: List<MessageInfo>,
     val recentTraceroutes: List<TracerouteInfo> = emptyList(),
+    val legacyRelayTotal: Int = 0,
+    val legacyRelayRssiSum: Double = 0.0,
+    val legacyRelayRssiCount: Int = 0,
+    val legacyRelaySnrSum: Double = 0.0,
+    val legacyRelaySnrCount: Int = 0,
     val totalPackets: Int,
     val decryptedPackets: Int,
     val failedDecryptions: Int,
@@ -60,6 +66,7 @@ class MeshtasticMonitor {
     private val myNodeLastBytes = mutableSetOf<Int>()
     private val lastByteToNames = mutableMapOf<Int, MutableList<String>>()
     private val relayNodeStats = mutableMapOf<Int, MutableMap<Int, RelayNodeStats>>()
+    private val nodeRoles = mutableMapOf<Int, Int>()
     private val recentPackets = ArrayDeque<PacketInfo>(MAX_PACKETS + 10)
     private val recentMessages = ArrayDeque<MessageInfo>(MAX_MESSAGES + 10)
     private val recentTraceroutes = ArrayDeque<TracerouteInfo>(MAX_TRACEROUTES + 10)
@@ -68,6 +75,11 @@ class MeshtasticMonitor {
     private var totalPackets = 0
     private var decryptedPackets = 0
     private var failedDecryptions = 0
+    private var legacyRelayTotal = 0
+    private var legacyRelayRssiSum = 0.0
+    private var legacyRelayRssiCount = 0
+    private var legacyRelaySnrSum = 0.0
+    private var legacyRelaySnrCount = 0
     private var startTime = System.currentTimeMillis()
     private var dbConfigured = false
     private var dbConnecting = false
@@ -135,12 +147,18 @@ class MeshtasticMonitor {
         myNodeLastBytes.clear()
         lastByteToNames.clear()
         relayNodeStats.clear()
+        nodeRoles.clear()
         recentPackets.clear()
         recentMessages.clear()
         recentTraceroutes.clear()
         totalPackets = 0
         decryptedPackets = 0
         failedDecryptions = 0
+        legacyRelayTotal = 0
+        legacyRelayRssiSum = 0.0
+        legacyRelayRssiCount = 0
+        legacyRelaySnrSum = 0.0
+        legacyRelaySnrCount = 0
         startTime = System.currentTimeMillis()
         dbConfigured = false
         dbConnecting = false
@@ -187,10 +205,20 @@ class MeshtasticMonitor {
                     setProperty("password", dbSettings.dbPassword)
                 }
                 val conn = DriverManager.getConnection(url, props)
+
+                // Detect optional columns so the query degrades gracefully on older schemas
+                val dbMeta = conn.metaData
+                val roleColRs = dbMeta.getColumns(null, null, "node_info", "role")
+                val hasRoleCol = roleColRs.next()
+                roleColRs.close()
+
+                val query = buildString {
+                    append("SELECT node_id, short_name, long_name, hex_id")
+                    if (hasRoleCol) append(", role AS node_role")
+                    append(" FROM node_info WHERE short_name IS NOT NULL AND short_name != ''")
+                }
                 val stmt = conn.createStatement()
-                val rs = stmt.executeQuery(
-                    "SELECT node_id, short_name, long_name, hex_id FROM node_info WHERE short_name IS NOT NULL AND short_name != ''"
-                )
+                val rs = stmt.executeQuery(query)
 
                 synchronized(this@MeshtasticMonitor) {
                     while (rs.next()) {
@@ -204,6 +232,24 @@ class MeshtasticMonitor {
                             nodeNames[nodeId] = shortName
                             if (!longName.isNullOrEmpty()) {
                                 nodeLongNames[nodeId] = longName
+                            }
+                            if (hasRoleCol) {
+                                val roleVal = rs.getString("node_role")
+                                // role column is text; may be numeric ("1") or named ("CLIENT_MUTE")
+                                val role = roleVal?.toIntOrNull() ?: when (roleVal?.uppercase()) {
+                                    "CLIENT_MUTE" -> 1
+                                    "ROUTER" -> 2
+                                    "ROUTER_CLIENT" -> 3
+                                    "REPEATER" -> 4
+                                    "TRACKER" -> 5
+                                    "SENSOR" -> 6
+                                    "ATAK" -> 7
+                                    "CLIENT_HIDDEN" -> 8
+                                    "LOST_AND_FOUND" -> 9
+                                    "ATAK_TRACKER" -> 10
+                                    else -> 0
+                                }
+                                if (role != 0) nodeRoles[nodeId] = role
                             }
                             if (!hexId.isNullOrEmpty()) {
                                 hexToNodeId[hexId] = nodeId
@@ -394,6 +440,13 @@ class MeshtasticMonitor {
                 val now = Instant.now()
                 val hops = hopStart - hopLimit
 
+                if (hops > 0 && relayNode == 0) {
+                    legacyRelayTotal++
+                    rssi?.let { legacyRelayRssiSum += it; legacyRelayRssiCount++ }
+                    snr?.let { legacyRelaySnrSum += it; legacyRelaySnrCount++ }
+                    Log.d(TAG, "Legacy relay: hops=$hops rssi=$rssi snr=$snr total=$legacyRelayTotal rssiCount=$legacyRelayRssiCount")
+                }
+
                 // Track gateway node IDs
                 hexToNodeId[gatewayId]?.let { gatewayNodeIds.add(it) }
 
@@ -494,7 +547,9 @@ class MeshtasticMonitor {
                     val candidates = relayNodeStats[relayNode]!!
                     val currentTime = System.currentTimeMillis()
 
-                    val viable = candidates.filter { (_, stats) ->
+                    val viable = candidates.filter { (nodeId, stats) ->
+                        // CLIENT_MUTE nodes (role=1) cannot relay in firmware — skip them
+                        if (nodeRoles[nodeId] == 1) return@filter false
                         if (stats.directPacketCount > 0) {
                             val avgH = stats.avgDirectHops
                             (avgH == null || avgH < 2.0) && stats.matchesSignal(rssi)
@@ -536,6 +591,9 @@ class MeshtasticMonitor {
                         }
                         if (user.longName.isNotEmpty()) {
                             nodeLongNames[fromId] = user.longName
+                        }
+                        if (user.role != 0) {
+                            nodeRoles[fromId] = user.role
                         }
                         // Update gateway name
                         if (gatewayId == "!${Integer.toUnsignedString(fromId, 16).padStart(8, '0')}") {
@@ -737,9 +795,15 @@ class MeshtasticMonitor {
             myNodeLastBytes = myNodeLastBytes.toSet(),
             lastByteToNames = lastByteToNames.mapValues { (_, v) -> v.toList() },
             relayNodeStats = relayNodeStats.mapValues { (_, v) -> v.toMap() },
+            nodeRoles = nodeRoles.toMap(),
             recentPackets = recentPackets.toList(),
             recentMessages = recentMessages.toList(),
             recentTraceroutes = recentTraceroutes.toList(),
+            legacyRelayTotal = legacyRelayTotal,
+            legacyRelayRssiSum = legacyRelayRssiSum,
+            legacyRelayRssiCount = legacyRelayRssiCount,
+            legacyRelaySnrSum = legacyRelaySnrSum,
+            legacyRelaySnrCount = legacyRelaySnrCount,
             totalPackets = totalPackets,
             decryptedPackets = decryptedPackets,
             failedDecryptions = failedDecryptions,
@@ -766,6 +830,8 @@ class MeshtasticMonitor {
         snapshot.lastByteToNames.forEach { (k, v) -> lastByteToNames[k] = v.toMutableList() }
         relayNodeStats.clear()
         snapshot.relayNodeStats.forEach { (k, v) -> relayNodeStats[k] = v.toMutableMap() }
+        nodeRoles.clear()
+        nodeRoles.putAll(snapshot.nodeRoles)
         recentPackets.clear()
         recentPackets.addAll(snapshot.recentPackets)
         recentMessages.clear()
@@ -775,6 +841,11 @@ class MeshtasticMonitor {
         totalPackets = snapshot.totalPackets
         decryptedPackets = snapshot.decryptedPackets
         failedDecryptions = snapshot.failedDecryptions
+        legacyRelayTotal = snapshot.legacyRelayTotal
+        legacyRelayRssiSum = snapshot.legacyRelayRssiSum
+        legacyRelayRssiCount = snapshot.legacyRelayRssiCount
+        legacyRelaySnrSum = snapshot.legacyRelaySnrSum
+        legacyRelaySnrCount = snapshot.legacyRelaySnrCount
         startTime = System.currentTimeMillis() - snapshot.uptimeMillis
         isDirty.set(true)
         Log.i(TAG, "Restored snapshot: ${snapshot.totalPackets} packets, ${snapshot.gateways.size} gateways")
@@ -797,7 +868,12 @@ class MeshtasticMonitor {
                 recentPackets = recentPackets.toList(),
                 recentMessages = recentMessages.toList(),
                 recentTraceroutes = recentTraceroutes.toList(),
+                legacyRelayTotal = legacyRelayTotal,
+                legacyRelayAvgRssi = if (legacyRelayRssiCount > 0) legacyRelayRssiSum / legacyRelayRssiCount else null,
+                legacyRelayAvgSnr = if (legacyRelaySnrCount > 0) legacyRelaySnrSum / legacyRelaySnrCount else null,
                 relayNodeStats = relayNodeStats.mapValues { (_, v) -> v.toMap() },
+                clientMuteNodeIds = nodeRoles.entries.filter { it.value == 1 }.map { it.key }.toSet(),
+                nodeRoles = nodeRoles.toMap(),
                 hexToNodeId = hexToNodeId.toMap(),
                 gatewayNodeIds = gatewayNodeIds.toSet(),
                 myNodeIds = myNodes.values.map { it.nodeId }.filter { it != 0 }.toSet(),

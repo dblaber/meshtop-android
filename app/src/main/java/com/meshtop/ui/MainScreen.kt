@@ -12,6 +12,7 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -22,7 +23,7 @@ import com.meshtop.data.MonitorUiState
 import com.meshtop.ui.theme.*
 import kotlinx.coroutines.launch
 
-private val TAB_TITLES = listOf("", "Msgs", "Gates", "Nodes", "Pkts", "TR")
+private val TAB_TITLES = listOf("", "Msgs", "Gates", "Nodes", "Pkts", "TR", "Relay")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,10 +75,11 @@ fun MainScreen(
         )
 
         // Tab row
-        TabRow(
+        ScrollableTabRow(
             selectedTabIndex = pagerState.currentPage,
             containerColor = SurfaceCard,
             contentColor = Color(0xFFE0E0E0),
+            edgePadding = 0.dp,
             divider = { HorizontalDivider(color = Color(0xFF333355)) },
             indicator = { tabPositions ->
                 if (pagerState.currentPage < tabPositions.size) {
@@ -97,24 +99,32 @@ fun MainScreen(
                 Tab(
                     selected = selected,
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
-                    text = if (index > 0) {{
-                        Text(
-                            text = title,
-                            fontFamily = Mono,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 13.sp,
-                            color = color,
-                        )
-                    }} else null,
-                    icon = if (index == 0) {{
-                        Icon(
-                            imageVector = Icons.Filled.Home,
-                            contentDescription = "Summary",
-                            tint = color,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }} else null,
-                )
+                    modifier = Modifier.height(36.dp),
+                ) {
+                    Box(
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (index == 0) {
+                            Icon(
+                                imageVector = Icons.Filled.Home,
+                                contentDescription = "Summary",
+                                tint = color,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        } else {
+                            Text(
+                                text = title,
+                                fontFamily = Mono,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 11.sp,
+                                color = color,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -131,6 +141,7 @@ fun MainScreen(
                 3 -> MyNodesScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
                 4 -> PacketsScreen(state = state, getRelayName = getRelayName, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
                 5 -> TracerouteScreen(state = state)
+                6 -> RelayNodesScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
             }
         }
     }
