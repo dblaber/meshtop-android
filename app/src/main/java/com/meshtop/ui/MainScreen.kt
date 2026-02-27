@@ -7,14 +7,19 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,6 +29,54 @@ import com.meshtop.ui.theme.*
 import kotlinx.coroutines.launch
 
 private val TAB_TITLES = listOf("", "Msgs", "Gates", "Nodes", "Pkts", "TR", "Relay")
+
+@Composable
+private fun SearchQueryBar(query: String, onQueryChange: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SurfaceCard)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Search,
+            contentDescription = "Search",
+            tint = TextDim,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Box(modifier = Modifier.weight(1f)) {
+            if (query.isEmpty()) {
+                Text(
+                    text = "search nodes, types, gateways...",
+                    color = TextDim,
+                    fontFamily = Mono,
+                    fontSize = 12.sp,
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = TextStyle(color = Color(0xFFE0E0E0), fontFamily = Mono, fontSize = 12.sp),
+                singleLine = true,
+                cursorBrush = SolidColor(FirstHearerCyan),
+            )
+        }
+        if (query.isNotEmpty()) {
+            IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Clear",
+                    tint = TextDim,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+    }
+    HorizontalDivider(color = Color(0xFF333355))
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +112,8 @@ fun MainScreen(
 
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { TAB_TITLES.size })
     val coroutineScope = rememberCoroutineScope()
+    var searchQuery by remember { mutableStateOf("") }
+    LaunchedEffect(pagerState.currentPage) { searchQuery = "" }
 
     Column(
         modifier = modifier
@@ -128,6 +183,11 @@ fun MainScreen(
             }
         }
 
+        // Search bar (hidden on Summary tab)
+        if (pagerState.currentPage != 0) {
+            SearchQueryBar(query = searchQuery, onQueryChange = { searchQuery = it })
+        }
+
         // Tab pages (no swipe - use tab bar to navigate)
         HorizontalPager(
             state = pagerState,
@@ -136,12 +196,12 @@ fun MainScreen(
         ) { page ->
             when (page) {
                 0 -> SummaryScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
-                1 -> MessagesScreen(state = state, getRelayName = getRelayName, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
-                2 -> GatewaysScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
-                3 -> MyNodesScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
-                4 -> PacketsScreen(state = state, getRelayName = getRelayName, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
-                5 -> TracerouteScreen(state = state)
-                6 -> RelayNodesScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes)
+                1 -> MessagesScreen(state = state, getRelayName = getRelayName, hideGateways = hideGateways, hideMyNodes = hideMyNodes, searchQuery = searchQuery)
+                2 -> GatewaysScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes, searchQuery = searchQuery)
+                3 -> MyNodesScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes, searchQuery = searchQuery)
+                4 -> PacketsScreen(state = state, getRelayName = getRelayName, hideGateways = hideGateways, hideMyNodes = hideMyNodes, searchQuery = searchQuery)
+                5 -> TracerouteScreen(state = state, searchQuery = searchQuery)
+                6 -> RelayNodesScreen(state = state, hideGateways = hideGateways, hideMyNodes = hideMyNodes, searchQuery = searchQuery)
             }
         }
     }

@@ -34,6 +34,7 @@ fun PacketsScreen(
     getRelayName: (Int) -> String,
     hideGateways: Boolean = false,
     hideMyNodes: Boolean = false,
+    searchQuery: String = "",
     modifier: Modifier = Modifier,
 ) {
     val excludedIds = remember(hideGateways, hideMyNodes, state.gatewayNodeIds, state.myNodeIds) {
@@ -42,9 +43,16 @@ fun PacketsScreen(
             if (hideMyNodes) addAll(state.myNodeIds)
         }
     }
-    val packets = remember(state.recentPackets, excludedIds) {
-        if (excludedIds.isEmpty()) state.recentPackets
-        else state.recentPackets.filter { it.fromId !in excludedIds }
+    val packets = remember(state.recentPackets, excludedIds, searchQuery) {
+        val filtered = if (excludedIds.isEmpty()) state.recentPackets
+            else state.recentPackets.filter { it.fromId !in excludedIds }
+        if (searchQuery.isEmpty()) filtered
+        else filtered.filter { pkt ->
+            pkt.fromName.contains(searchQuery, ignoreCase = true) ||
+            pkt.portnumName.contains(searchQuery, ignoreCase = true) ||
+            pkt.gatewayName.contains(searchQuery, ignoreCase = true) ||
+            (pkt.relayNode > 0 && String.format("%02x", pkt.relayNode).contains(searchQuery, ignoreCase = true))
+        }
     }
     val scrollState = rememberScrollState()
     var selectedPacket by remember { mutableStateOf<PacketInfo?>(null) }

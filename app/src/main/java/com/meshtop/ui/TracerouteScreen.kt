@@ -32,6 +32,7 @@ private data class TracerouteGroup(
 @Composable
 fun TracerouteScreen(
     state: MonitorUiState,
+    searchQuery: String = "",
     modifier: Modifier = Modifier,
 ) {
     // Group by packetId; preserve newest-first order using the earliest timestamp per group
@@ -48,13 +49,25 @@ fun TracerouteScreen(
             }
     }
 
+    val displayedGroups = remember(groups, searchQuery) {
+        if (searchQuery.isEmpty()) groups
+        else groups.filter { group ->
+            val tr = group.representative
+            tr.fromName.contains(searchQuery, ignoreCase = true) ||
+            tr.toName.contains(searchQuery, ignoreCase = true) ||
+            tr.routeNames.any { it.contains(searchQuery, ignoreCase = true) } ||
+            tr.routeBackNames.any { it.contains(searchQuery, ignoreCase = true) } ||
+            group.gateways.any { it.gatewayName.contains(searchQuery, ignoreCase = true) }
+        }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         SectionDescription(
             title = "Traceroutes",
             description = "RouteDiscovery packets (portnum 70) showing the RF path through the mesh, newest first."
         )
 
-        if (groups.isEmpty()) {
+        if (displayedGroups.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -62,7 +75,7 @@ fun TracerouteScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No traceroutes received yet",
+                    text = if (groups.isEmpty()) "No traceroutes received yet" else "No matches for \"$searchQuery\"",
                     color = TextDim,
                     fontFamily = Mono,
                     fontSize = 14.sp,
@@ -74,7 +87,7 @@ fun TracerouteScreen(
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                items(groups) { group ->
+                items(displayedGroups) { group ->
                     TracerouteCard(group)
                 }
             }

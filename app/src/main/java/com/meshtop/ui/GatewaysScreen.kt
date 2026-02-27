@@ -35,9 +35,22 @@ fun GatewaysScreen(
     state: MonitorUiState,
     hideGateways: Boolean = false,
     hideMyNodes: Boolean = false,
+    searchQuery: String = "",
     modifier: Modifier = Modifier,
 ) {
-    val gateways = state.gateways.sortedByDescending { it.filteredCount(hideGateways, hideMyNodes) }
+    val gateways = remember(state.gateways, state.hexToNodeId, hideGateways, hideMyNodes, searchQuery) {
+        state.gateways
+            .filter { gw ->
+                searchQuery.isEmpty() ||
+                gw.shortName.contains(searchQuery, ignoreCase = true) ||
+                gw.longName.contains(searchQuery, ignoreCase = true) ||
+                gw.gatewayId.contains(searchQuery, ignoreCase = true) ||
+                (state.hexToNodeId[gw.gatewayId]
+                    ?.let { String.format("%02x", it and 0xFF) }
+                    ?.contains(searchQuery, ignoreCase = true) == true)
+            }
+            .sortedByDescending { it.filteredCount(hideGateways, hideMyNodes) }
+    }
     val scrollState = rememberScrollState()
     var selectedGateway by remember { mutableStateOf<GatewayStats?>(null) }
 

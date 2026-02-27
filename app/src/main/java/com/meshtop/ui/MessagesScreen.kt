@@ -37,6 +37,7 @@ fun MessagesScreen(
     getRelayName: (Int) -> String,
     hideGateways: Boolean = false,
     hideMyNodes: Boolean = false,
+    searchQuery: String = "",
     modifier: Modifier = Modifier,
 ) {
     val excludedIds = remember(hideGateways, hideMyNodes, state.gatewayNodeIds, state.myNodeIds) {
@@ -85,13 +86,23 @@ fun MessagesScreen(
         result
     }
 
+    val displayedGroups = remember(grouped, searchQuery) {
+        if (searchQuery.isEmpty()) grouped
+        else grouped.filter { gm ->
+            gm.best.fromName.contains(searchQuery, ignoreCase = true) ||
+            gm.best.toName.contains(searchQuery, ignoreCase = true) ||
+            gm.best.text.contains(searchQuery, ignoreCase = true) ||
+            gm.best.gatewayName.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         SectionDescription(
             title = "Text Messages",
             description = "Aggregated messages from all nodes. Grouped by packet ID across gateways."
         )
 
-        if (grouped.isEmpty()) {
+        if (displayedGroups.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -108,7 +119,7 @@ fun MessagesScreen(
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                items(grouped, key = { it.best.packetId }) { gm ->
+                items(displayedGroups, key = { it.best.packetId }) { gm ->
                     MessageCard(gm, onTap = { selectedMessage = gm })
                 }
             }

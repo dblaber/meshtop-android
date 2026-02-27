@@ -31,11 +31,21 @@ fun MyNodesScreen(
     state: MonitorUiState,
     hideGateways: Boolean = false,
     hideMyNodes: Boolean = false,
+    searchQuery: String = "",
     modifier: Modifier = Modifier,
 ) {
-    val nodes = state.myNodes.entries
-        .sortedBy { it.key }
-        .map { (key, node) -> key to node }
+    val nodes = remember(state.myNodes, searchQuery) {
+        state.myNodes.entries
+            .filter { (key, node) ->
+                searchQuery.isEmpty() ||
+                key.contains(searchQuery, ignoreCase = true) ||
+                node.shortName.contains(searchQuery, ignoreCase = true) ||
+                (node.nodeId != 0 && String.format("%08x", node.nodeId).contains(searchQuery, ignoreCase = true)) ||
+                (node.nodeId != 0 && String.format("%02x", node.nodeId and 0xFF).contains(searchQuery, ignoreCase = true))
+            }
+            .sortedBy { it.key }
+            .map { (key, node) -> key to node }
+    }
     val scrollState = rememberScrollState()
     var selectedNode by remember { mutableStateOf<Pair<String, NodeStats>?>(null) }
 

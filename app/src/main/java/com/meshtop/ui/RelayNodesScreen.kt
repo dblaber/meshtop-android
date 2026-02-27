@@ -36,10 +36,11 @@ fun RelayNodesScreen(
     state: MonitorUiState,
     hideGateways: Boolean = false,
     hideMyNodes: Boolean = false,
+    searchQuery: String = "",
     modifier: Modifier = Modifier,
 ) {
     // Collapse to one row per relay byte; pick highest-scoring candidate as the identity
-    val rows = remember(state.relayNodeStats, state.gatewayNodeIds, state.myNodeIds, state.clientMuteNodeIds, hideGateways, hideMyNodes) {
+    val rows = remember(state.relayNodeStats, state.gatewayNodeIds, state.myNodeIds, state.clientMuteNodeIds, hideGateways, hideMyNodes, searchQuery) {
         val currentTime = System.currentTimeMillis()
         state.relayNodeStats
             .entries
@@ -59,6 +60,11 @@ fun RelayNodesScreen(
             .filter { row -> row.best.nodeId !in state.clientMuteNodeIds }
             .filter { row -> !hideGateways || row.best.nodeId !in state.gatewayNodeIds }
             .filter { row -> !hideMyNodes || row.best.nodeId !in state.myNodeIds }
+            .filter { row ->
+                searchQuery.isEmpty() ||
+                row.best.shortName.contains(searchQuery, ignoreCase = true) ||
+                "%02x".format(row.lastByte).contains(searchQuery, ignoreCase = true)
+            }
             .sortedByDescending { it.maxRelayCount }
     }
 

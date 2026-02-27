@@ -4,7 +4,7 @@
 
 meshtop-android is an Android app that monitors Meshtastic mesh networks via MQTT, built with Kotlin and Jetpack Compose.
 
-The app connects to an MQTT broker, receives Meshtastic mesh packets, decrypts them (AES-128-CTR), and displays real-time statistics across six tabbed views: Summary, Messages, Gateways, My Nodes, Packets, and Traceroutes (TR).
+The app connects to an MQTT broker, receives Meshtastic mesh packets, decrypts them (AES-128-CTR), and displays real-time statistics across seven tabbed views: Summary, Messages, Gateways, My Nodes, Packets, Traceroutes (TR), and Relay Nodes.
 
 ## Build & Run
 
@@ -35,13 +35,14 @@ com.meshtop/
 ├── viewmodel/
 │   └── MonitorViewModel.kt  # AndroidViewModel bridging MeshtasticMonitor to Compose UI
 └── ui/
-    ├── MainScreen.kt        # HorizontalPager with tab bar (6 tabs); BackHandler for settings dismiss
+    ├── MainScreen.kt        # HorizontalPager with tab bar (7 tabs), search bar; BackHandler for settings dismiss
     ├── SummaryScreen.kt     # Network overview dashboard with Canvas-based visualizations (6 cards)
     ├── MessagesScreen.kt    # Card-based message display grouped by packetId
     ├── GatewaysScreen.kt    # Gateway stats table + shared composables (SectionDescription, HeaderCell, DataCell)
     ├── MyNodesScreen.kt     # Tracked node stats table (dynamic from settings)
     ├── PacketsScreen.kt     # Raw packet feed table
     ├── TracerouteScreen.kt  # Traceroute (portnum 70) cards, grouped by packetId across gateways
+    ├── RelayNodesScreen.kt  # Relay node table (one row per relay byte, candidate detail dialog)
     ├── SettingsScreen.kt    # MQTT + PostgreSQL settings form
     ├── StatsHeader.kt       # Connection status dots (MQTT + DB) and stats chips
     └── theme/Theme.kt       # Dark color scheme and typography
@@ -54,7 +55,8 @@ com.meshtop/
 - **Foreground service**: `MonitorService` holds a `PARTIAL_WAKE_LOCK` and runs as `foregroundServiceType="dataSync"` to keep MQTT alive in the background
 - **Tab navigation only**: `HorizontalPager` has `userScrollEnabled = false` to avoid conflicts with horizontally scrollable tables
 - **Settings back gesture**: `BackHandler(enabled = showSettings)` in `MainScreen` intercepts the system back gesture to dismiss settings rather than exit the app
-- **Notification dedup**: `MonitorService` seeds `notifiedPacketIds` from the first `recentMessages` emission (MQTT backlog) to suppress startup notification blasts; only subsequent new messages fire alerts
+- **Notification dedup**: `MonitorService` seeds `notifiedPacketIds` from the first `recentMessages` emission (MQTT backlog) to suppress startup notification blasts; the set is persisted to SharedPreferences (`meshtop_notif` / `notified_ids`) so re-notifications don't occur after app kill/restart
+- **Search bar**: `MainScreen` owns a `searchQuery` state string cleared on every tab change (`LaunchedEffect`). A `SearchQueryBar` composable sits between the tab row and pager on all tabs except Summary. Each screen accepts `searchQuery: String = ""` and filters its data list with case-insensitive substring match
 
 ### Data flow
 
@@ -69,9 +71,12 @@ com.meshtop/
 Meshtastic relay node IDs are only the last byte of the full node ID, creating ambiguity. The `RelayNodeStats` class tracks candidates per last-byte value, scoring them by:
 - Direct packet count and recency
 - Hop distance (>= 3 hops disqualifies)
+- Zero-hop observations (strongest signal — node is local)
 - Relay count and recency
 - RSSI/SNR signal quality
 - Signal consistency (`matchesSignal()`)
+
+The `RelayNodesScreen` collapses candidates to one row per relay byte (best-scoring candidate as identity). Tapping a row opens a detail dialog showing all candidates with scores. CLIENT_MUTE nodes (role=1) are excluded from the relay table since they cannot relay. Node roles are tracked in `nodeRoles: Map<Int, Int>` (populated from NODEINFO packets and PostgreSQL `role` column — note: `role` is a `text` column in the DB, parsed with `toIntOrNull()` plus named-string fallback).
 
 ### Traceroute handling (portnum 70)
 
@@ -110,6 +115,7 @@ cause silent misparse (e.g. RSSI always 0, SNR garbage). This has bitten us befo
 
 | Version | Highlights |
 |---------|-----------|
+| v0.4.0  | Relay Nodes tab (candidate disambiguation, role filtering, detail dialog); notification persistence fix; search bar on all tabs |
 | v0.3.0  | Traceroutes (TR) tab; settings back gesture fix; startup notification blast fix |
 | v0.2.x  | About dialog, version from git tags, per-source signal bucketing, relay scoring fixes |
 | v0.1.x  | Initial build: MQTT monitoring, 5 tabs, AES decryption, PostgreSQL optional preload |
