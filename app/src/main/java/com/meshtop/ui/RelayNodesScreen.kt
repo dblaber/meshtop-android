@@ -47,7 +47,10 @@ fun RelayNodesScreen(
             .mapNotNull { (lastByte, candidates) ->
                 // Only show bytes where at least one candidate has been seen relaying
                 if (candidates.values.none { it.relayCount > 0 }) return@mapNotNull null
-                val best = candidates.values.maxByOrNull { it.score(currentTime) }
+                // Pick best candidate, preferring non-CLIENT_MUTE nodes
+                val nonMuted = candidates.values.filter { it.nodeId !in state.clientMuteNodeIds }
+                val best = (nonMuted.ifEmpty { candidates.values.toList() })
+                    .maxByOrNull { it.score(currentTime) }
                     ?: return@mapNotNull null
                 RelayRow(
                     lastByte = lastByte,
@@ -56,8 +59,6 @@ fun RelayNodesScreen(
                     maxRelayCount = candidates.values.maxOf { it.relayCount },
                 )
             }
-            // Filters are applied to the winning candidate's nodeId
-            .filter { row -> row.best.nodeId !in state.clientMuteNodeIds }
             .filter { row -> !hideGateways || row.best.nodeId !in state.gatewayNodeIds }
             .filter { row -> !hideMyNodes || row.best.nodeId !in state.myNodeIds }
             .filter { row ->
@@ -211,8 +212,16 @@ private fun RelayDetailDialog(
     onDismiss: () -> Unit,
 ) {
     val currentTime = remember { System.currentTimeMillis() }
-    val sorted = remember(candidates) {
-        candidates.sortedByDescending { it.score(currentTime) }
+    val sorted = remember(candidates, nodeRoles) {
+        // Sort non-CLIENT_MUTE first, then CLIENT_MUTE, each group by score descending
+        candidates.sortedWith(
+            compareBy<RelayNodeStats> { nodeRoles[it.nodeId] == 1 }
+                .thenByDescending { it.score(currentTime) }
+        )
+    }
+    // Winner is the top non-CLIENT_MUTE candidate
+    val winnerId = remember(sorted, nodeRoles) {
+        sorted.firstOrNull { nodeRoles[it.nodeId] != 1 }?.nodeId
     }
 
     AlertDialog(
@@ -237,8 +246,7 @@ private fun RelayDetailDialog(
             ) {
                 sorted.forEachIndexed { idx, stats ->
                     val score = stats.score(currentTime)
-                    val isWinner = idx == 0 && score > 0 &&
-                            (sorted.size == 1 || score > (sorted.getOrNull(1)?.score(currentTime) ?: Double.MIN_VALUE))
+                    val isWinner = stats.nodeId == winnerId && score > 0
                     val hexId = "!%08x".format(stats.nodeId.toLong() and 0xFFFFFFFFL)
                     val avgDirSnr = if (stats.directSnrCount > 0) stats.directSnrSum / stats.directSnrCount else null
                     val roleInt = nodeRoles[stats.nodeId]

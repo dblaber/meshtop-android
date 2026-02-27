@@ -553,9 +553,25 @@ class MeshtasticMonitor {
                 }
 
                 // Update relay node stats for candidates
-                if (relayNode > 0 && relayNode in relayNodeStats) {
+                if (relayNode > 0) {
+                    if (relayNode !in relayNodeStats) {
+                        // Create placeholder entry so relay observations aren't lost
+                        // for bytes not yet seen via NODEINFO or DB
+                        relayNodeStats[relayNode] = mutableMapOf()
+                        Log.d(TAG, "Relay byte 0x${"%02x".format(relayNode)} not in relayNodeStats, created empty map")
+                    }
                     val candidates = relayNodeStats[relayNode]!!
                     val currentTime = System.currentTimeMillis()
+
+                    // If no candidates exist yet, create a placeholder
+                    if (candidates.isEmpty()) {
+                        val syntheticId = relayNode // placeholder nodeId
+                        candidates[syntheticId] = RelayNodeStats(
+                            nodeId = syntheticId,
+                            shortName = "!..${"%02x".format(relayNode)}",
+                        )
+                        Log.d(TAG, "Created placeholder relay candidate for byte 0x${"%02x".format(relayNode)}")
+                    }
 
                     val viable = candidates.filter { (nodeId, stats) ->
                         // CLIENT_MUTE nodes (role=1) cannot relay in firmware — skip them
@@ -570,7 +586,18 @@ class MeshtasticMonitor {
                     val zeroHopViable = viable.filter { (_, stats) -> stats.zeroHopCount > 0 }
                     val toUpdate = if (zeroHopViable.isNotEmpty()) zeroHopViable else viable
 
-                    if (toUpdate.isNotEmpty() && rssi != null && rssi > -120f) {
+                    if (toUpdate.isEmpty()) {
+                        // All candidates were filtered out — fall back to all non-CLIENT_MUTE
+                        val fallback = candidates.filter { (nodeId, _) -> nodeRoles[nodeId] != 1 }
+                        if (fallback.isNotEmpty()) {
+                            for ((_, stats) in fallback) {
+                                stats.relayCount++
+                                stats.lastSeenRelay = currentTime
+                                rssi?.let { if (it > -120f) { stats.relayRssiSum += it; stats.relayRssiCount++ } }
+                                snr?.let { stats.relaySnrSum += it; stats.relaySnrCount++ }
+                            }
+                        }
+                    } else if (rssi != null && rssi > -120f) {
                         for ((_, stats) in toUpdate) {
                             stats.relayCount++
                             stats.lastSeenRelay = currentTime
