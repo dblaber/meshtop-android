@@ -286,7 +286,7 @@ private fun RelayDetailDialog(
                     )
                     DetailRow("Role", roleStr, color = when (roleInt) {
                         1 -> WarningYellow        // CLIENT_MUTE — can't relay
-                        2, 3, 4 -> DirectGreen    // ROUTER / ROUTER_CLIENT / REPEATER
+                        2, 3, 4, 11 -> DirectGreen  // ROUTER / ROUTER_CLIENT / REPEATER / ROUTER_LATE
                         else -> TextDim
                     })
 
@@ -370,10 +370,12 @@ private fun roleLabel(role: Int): String = when (role) {
     4 -> "Repeater"
     5 -> "Tracker"
     6 -> "Sensor"
-    7 -> "ATAK"
+    7 -> "TAK"
     8 -> "ClientHidden"
     9 -> "LostFound"
-    10 -> "ATAKTracker"
+    10 -> "TAKTracker"
+    11 -> "RouterLate"
+    12 -> "ClientBase"
     else -> "Role($role)"
 }
 

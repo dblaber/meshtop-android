@@ -211,12 +211,14 @@ class MeshtasticMonitor {
                 val roleColRs = dbMeta.getColumns(null, null, "node_info", "role")
                 val hasRoleCol = roleColRs.next()
                 roleColRs.close()
+                Log.d(TAG, "DB role column detected: $hasRoleCol")
 
                 val query = buildString {
                     append("SELECT node_id, short_name, long_name, hex_id")
                     if (hasRoleCol) append(", role AS node_role")
                     append(" FROM node_info WHERE short_name IS NOT NULL AND short_name != ''")
                 }
+                Log.d(TAG, "DB query: $query")
                 val stmt = conn.createStatement()
                 val rs = stmt.executeQuery(query)
 
@@ -237,19 +239,27 @@ class MeshtasticMonitor {
                                 val roleVal = rs.getString("node_role")
                                 // role column is text; may be numeric ("1") or named ("CLIENT_MUTE")
                                 val role = roleVal?.toIntOrNull() ?: when (roleVal?.uppercase()) {
+                                    "CLIENT" -> 0
                                     "CLIENT_MUTE" -> 1
                                     "ROUTER" -> 2
                                     "ROUTER_CLIENT" -> 3
                                     "REPEATER" -> 4
                                     "TRACKER" -> 5
                                     "SENSOR" -> 6
-                                    "ATAK" -> 7
+                                    "TAK" -> 7
                                     "CLIENT_HIDDEN" -> 8
                                     "LOST_AND_FOUND" -> 9
-                                    "ATAK_TRACKER" -> 10
-                                    else -> 0
+                                    "TAK_TRACKER" -> 10
+                                    "ROUTER_LATE" -> 11
+                                    "CLIENT_BASE" -> 12
+                                    else -> null
                                 }
-                                if (role != 0) nodeRoles[nodeId] = role
+                                if (role != null) {
+                                    nodeRoles[nodeId] = role
+                                    Log.d(TAG, "DB role: $shortName ($nodeId) = $roleVal -> $role")
+                                } else {
+                                    Log.d(TAG, "DB role UNRECOGNIZED: $shortName ($nodeId) = '$roleVal'")
+                                }
                             }
                             if (!hexId.isNullOrEmpty()) {
                                 hexToNodeId[hexId] = nodeId
@@ -592,9 +602,7 @@ class MeshtasticMonitor {
                         if (user.longName.isNotEmpty()) {
                             nodeLongNames[fromId] = user.longName
                         }
-                        if (user.role != 0) {
-                            nodeRoles[fromId] = user.role
-                        }
+                        nodeRoles[fromId] = user.role
                         // Update gateway name
                         if (gatewayId == "!${Integer.toUnsignedString(fromId, 16).padStart(8, '0')}") {
                             if (user.shortName.isNotEmpty()) gw.shortName = user.shortName
